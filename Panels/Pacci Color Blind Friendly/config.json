@@ -1,0 +1,18 @@
+{
+  "id":"pa-color-blind",
+  "type": "sheet",
+  "animationConfig": {
+    "normal": { "row": 1, "frames": 1 },
+    "swapping": { "row": 1, "frames": 1 },
+    "hovering": { "row": 1, "frames": 1 },
+    "falling": { "row": 1, "frames": 1 },
+    "dimmed": { "row": 1, "frames": 1 },
+    "dead": { "row": 1, "frames": 1 },
+    "landing": { "row": 2, "durationPerFrame": 1, "frames": 4 },
+    "danger": { "row": 3, "durationPerFrame": 1, "frames": 9 },
+    "flash": { "row": 4, "durationPerFrame": 2, "frames": 2 },
+    "face": { "row": 5, "frames": 1 },
+    "popping": { "row": 6, "durationPerFrame": 1, "frames": 6 },
+    "garbagePop": { "row": 1, "frames": 1 }
+  }
+}
