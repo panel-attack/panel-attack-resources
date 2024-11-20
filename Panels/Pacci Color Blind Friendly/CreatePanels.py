@@ -102,14 +102,14 @@ class Sheet:
   def buildDimmedAnimation(self):
     self.startAnimation()
     panelImage = self.standardPanelImage()
-    panelImage = adjustExtremes(panelImage, 0, 180)
+    panelImage = adjustExtremes(panelImage, 0, 150)
     self.addFrame(panelImage)
     self.endAnimation()
 
   def buildDeadAnimation(self):
     self.startAnimation()
     panelImage = self.standardPanelImage()
-    panelImage = adjustExtremes(panelImage, 0, 150)
+    panelImage = adjustExtremes(panelImage, 0, 140)
     # panelImage = adjust_levels(panelImage, 0, 255)
     self.addFrame(panelImage)
     self.endAnimation()
@@ -129,16 +129,29 @@ class Sheet:
 
   def buildDangerAnimation(self):
       self.startAnimation()
-      yOffset = 0
-      for x in range(0, self.panelConfig.dangerAnimationCount):
-      # print(yOffset)
+      # xOffset, yOffset, xScale, yScale
+      animations = [[0, 0, 1, 1],
+                    [0, -0.02, 1, 1],
+                    [0, -0.04, 1, 1],
+                    [0, -0.06, 1, 1],
+                    [0, -0.04, 1, 1],
+                    [0, -0.02, 1, 1],
+                    [0, 0, 1, 1],
+                    [0, 0.06, 1.05, 0.9],
+                    [0, 0.09, 1.1, 0.8],
+                    [0, 0.06, 1.05, 0.9],
+                    ]
+      for animation in animations:
+        if self.panelConfig.dangerBounceReduced:
+          animation = [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1]
+        newWidth = int(animation[2] * self.panelSize[0])
+        newHeight = int(animation[3] * self.panelSize[1])
+        xOffset = int(animation[0] * self.panelSize[0]) + int((self.panelSize[0] - newWidth) / 2)
+        yOffset = int(animation[1] * self.panelSize[1]) + int((self.panelSize[1] - newHeight) / 2)
         panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
-        panelImage.paste(self.shapeImage, (0, yOffset), self.shapeImage)
+        squishedShapeImage = self.shapeImage.resize([newWidth, newHeight])
+        panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
         self.addFrame(panelImage)
-        if x >= (self.panelConfig.dangerAnimationCount-1) / 2:
-          yOffset += 1
-        else:
-          yOffset -= 1
       self.endAnimation()
   
   def buildFlashAnimation(self):
@@ -167,7 +180,6 @@ class Sheet:
 
   def buildPopAnimation(self):
       self.startAnimation()
-      yOffset = 0
       multiplier = 1
       multiplierIncrement = 0.2
       multiplierDecrement = 0.3
@@ -191,16 +203,17 @@ class PanelsConfig:
     self.folder = "RawImages/"
     self.outputFolder = "OutputPanels/"
     self.landingAnimationCount = 10
-    self.dangerAnimationCount = 10
     self.popAnimationCount = 6
-    self.maxAnimationFrames = self.dangerAnimationCount
+    self.maxAnimationFrames = self.landingAnimationCount
     self.animationCount = 10
+    self.dangerBounceReduced = True
+
   def createSheets(self):
     for i in range(1, 9):
       index = str(i)
       sheet = Sheet(self, index)
       sheet.buildSheet(index)
-      if i == 1:
+      if i == 2:
         sheet.sheetImage.show()
     configFileName = "config.json"
     shutil.copyfile(configFileName, self.outputFolder + configFileName)
