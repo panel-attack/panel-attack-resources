@@ -1,10 +1,27 @@
 #brew install pillow
 import shutil
 from PIL import Image, ImageEnhance
+import numpy as numpy
+import blend_modes as blend_modes
 
+def blendImages(background, foreground, opacity, functionToRun):
+  background_img = numpy.array(background)  # Inputs to blend_modes need to be numpy arrays.
+  background_img_float = background_img.astype(float)  # Inputs to blend_modes need to be floats.
+
+  foreground_img = numpy.array(foreground)  # Inputs to blend_modes need to be numpy arrays.
+  foreground_img_float = foreground_img.astype(float)  # Inputs to blend_modes need to be floats.
+
+  blended_img_float = functionToRun(background_img_float, foreground_img_float, opacity)
+
+  # Convert blended image back into PIL image
+  blended_img = numpy.uint8(blended_img_float)  # Image needs to be converted back to uint8 type for PIL handling.
+  blended_img_raw = Image.fromarray(blended_img)  # Note that alpha channels are displayed in black by PIL by default.
+                                                  # This behavior is difficult to change (although possible).
+                                                  # If you have alpha channels in your images, then you should give
+                                                  # OpenCV a try.
+  return blended_img_raw
 
 def doubleBrightness(image, multiplier, exponent):
-
     r, g, b, a = image.split()
     r = r.point(lambda pixel: max(0, min(255, int((pixel * multiplier) ** exponent)))) 
     g = g.point(lambda pixel: max(0, min(255, int((pixel * multiplier) ** exponent)))) 
@@ -12,7 +29,6 @@ def doubleBrightness(image, multiplier, exponent):
     return Image.merge("RGBA", (r, g, b, a))
 
 def adjustExtremes(image, minValue=0, maxValue=255):
-
     r, g, b, a = image.split()
     r = r.point(lambda pixel: max(minValue, min(maxValue, minValue + int(pixel / 255 * (maxValue - minValue))))) 
     g = g.point(lambda pixel: max(minValue, min(maxValue, minValue + int(pixel / 255 * (maxValue - minValue))))) 
@@ -70,7 +86,10 @@ class Sheet:
     self.buildDimmedAnimation()
     self.buildDeadAnimation()
     self.buildLandingAnimation()
-    self.buildDangerAnimation()
+    if self.panelConfig.useDangerBounce:
+      self.buildBounceDangerAnimation()
+    else:
+      self.buildShineDangerAnimation()
     self.buildFlashAnimation()
     self.buildFaceAnimation()
     self.buildPopAnimation()
@@ -116,18 +135,52 @@ class Sheet:
 
   def buildLandingAnimation(self):
       self.startAnimation()
-      yOffset = 0
+      yOffset = 6
       for x in range(0, self.panelConfig.landingAnimationCount):
-        panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
+        panelImage = self.backgroundImage.copy()
         panelImage.paste(self.shapeImage, (0, yOffset), self.shapeImage)
+        panelImage = Image.alpha_composite(panelImage, self.borderImage)
         self.addFrame(panelImage)
-        if x >= (self.panelConfig.landingAnimationCount-1) / 2:
-          yOffset -= 1
-        else:
-          yOffset += 1
+        yOffset -= 1
       self.endAnimation()
 
-  def buildDangerAnimation(self):
+  def buildShineDangerAnimation(self):
+      self.startAnimation()
+      # amount = self.panelSize[0] / 2
+      # for x in numpy.arange(amount, -amount, -2 * amount / 10):
+      #   xOffset = int(x)
+      #   yOffset = int(-x)
+      #   panelImage = self.backgroundImage.copy()
+
+      #   shineOffsetImage = Image.new('RGBA', self.panelSize, (255, 0, 0, 0))
+      #   shineImage = Image.open(self.panelConfig.folder + "shine.png", mode = 'r')
+      #   shineOffsetImage.paste(shineImage, (xOffset, yOffset), shineImage)
+        
+      #   panelImage = blendImages(panelImage, shineOffsetImage, .75, blend_modes.overlay)
+      #   self.addFrame(panelImage)
+
+      alphas = []
+      min = 150
+      max = 255
+      step = int((max - min) / 5)
+      for a in numpy.arange(min, max, step):
+        alphas.append(a)
+      for a in numpy.arange(max, min, -step):
+        alphas.append(a)
+
+      for alpha in alphas:
+        panelImage = self.backgroundImage.copy()
+
+        shineOffsetImage = Image.new('RGBA', self.panelSize, (255, 255, 255, alpha))
+        blendedShineImage = blendImages(self.borderImage, shineOffsetImage, 0.5, blend_modes.overlay)
+
+        panelImage = Image.alpha_composite(panelImage, blendedShineImage)
+        panelImage = Image.alpha_composite(panelImage, self.shapeImage)
+
+        self.addFrame(panelImage)
+      self.endAnimation()
+
+  def buildBounceDangerAnimation(self):
       self.startAnimation()
       # xOffset, yOffset, xScale, yScale
       animations = [[0, 0, 1, 1],
@@ -202,10 +255,11 @@ class PanelsConfig:
   def __init__(self):
     self.folder = "RawImages/"
     self.outputFolder = "OutputPanels/"
-    self.landingAnimationCount = 10
+    self.landingAnimationCount = 7
     self.popAnimationCount = 6
-    self.maxAnimationFrames = self.landingAnimationCount
+    self.maxAnimationFrames = 10
     self.animationCount = 10
+    self.useDangerBounce = False
     self.dangerBounceReduced = True
 
   def createSheets(self):
@@ -213,7 +267,7 @@ class PanelsConfig:
       index = str(i)
       sheet = Sheet(self, index)
       sheet.buildSheet(index)
-      if i == 2:
+      if i == 1:
         sheet.sheetImage.show()
     configFileName = "config.json"
     shutil.copyfile(configFileName, self.outputFolder + configFileName)
