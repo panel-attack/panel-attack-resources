@@ -134,16 +134,31 @@ class Sheet:
     self.addFrame(panelImage)
     self.endAnimation()
 
-  def buildLandingAnimation(self):
+  # Builds an animation with the shapes transformed by a set of animations of: xOffset, yOffset, xScale, yScale
+  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations):
       self.startAnimation()
-      yOffset = 6
-      for x in range(0, self.panelConfig.landingAnimationCount):
-        panelImage = self.backgroundImage.copy()
-        panelImage.paste(self.shapeImage, (0, yOffset), self.shapeImage)
-        panelImage = Image.alpha_composite(panelImage, self.borderImage)
+      for animation in shapeTransformAnimations:
+        newWidth = int(animation[2] * self.panelSize[0])
+        newHeight = int(animation[3] * self.panelSize[1])
+        xOffset = int(animation[0] * self.panelSize[0]) + int((self.panelSize[0] - newWidth) / 2)
+        yOffset = int(animation[1] * self.panelSize[1]) + int((self.panelSize[1] - newHeight) / 2)
+        panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
+        squishedShapeImage = self.shapeImage.resize([newWidth, newHeight])
+        panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
         self.addFrame(panelImage)
-        yOffset -= 1
       self.endAnimation()
+
+  def buildLandingAnimation(self):
+      # xOffset, yOffset, xScale, yScale
+      animations = [[0, 0.075, 1.075, 0.85],
+                    [0, 0.09, 1.1, 0.8],
+                    [0, 0.075, 1.075, 0.85],
+                    [0, 0.06, 1.05, 0.9],
+                    [0, 0.03, 1.025, 0.95],
+                    [0, 0.015, 1.0125, 0.975],
+                    [0, 0, 1, 1]
+                    ]
+      self.buildAnimationWithShapeTransforms(animations)
 
   def buildShineDangerAnimation(self):
       self.startAnimation()
@@ -182,7 +197,6 @@ class Sheet:
       self.endAnimation()
 
   def buildBounceDangerAnimation(self):
-      self.startAnimation()
       # xOffset, yOffset, xScale, yScale
       animations = [[0, 0, 1, 1],
                     [0, -0.02, 1, 1],
@@ -195,18 +209,9 @@ class Sheet:
                     [0, 0.09, 1.1, 0.8],
                     [0, 0.06, 1.05, 0.9],
                     ]
-      for animation in animations:
-        if self.panelConfig.dangerBounceReduced:
-          animation = [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1]
-        newWidth = int(animation[2] * self.panelSize[0])
-        newHeight = int(animation[3] * self.panelSize[1])
-        xOffset = int(animation[0] * self.panelSize[0]) + int((self.panelSize[0] - newWidth) / 2)
-        yOffset = int(animation[1] * self.panelSize[1]) + int((self.panelSize[1] - newHeight) / 2)
-        panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
-        squishedShapeImage = self.shapeImage.resize([newWidth, newHeight])
-        panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
-        self.addFrame(panelImage)
-      self.endAnimation()
+      if self.panelConfig.dangerBounceReduced:
+        animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1], animations)
+      self.buildAnimationWithShapeTransforms(animations)
   
   def buildFlashAnimation(self):
       self.startAnimation()
@@ -263,7 +268,7 @@ class PanelsConfig:
     self.maxAnimationFrames = 10
     self.animationCount = 10
     self.useDangerBounce = True
-    self.dangerBounceReduced = False
+    self.dangerBounceReduced = True
     self.previewImage = None
 
   def createSheets(self):
@@ -274,8 +279,8 @@ class PanelsConfig:
       index = str(i)
       sheet = Sheet(self, index)
       sheet.buildSheet(index)
-      # if i == 1:
-      # sheet.sheetImage.show()
+      if i == 2:
+        sheet.sheetImage.show()
       if self.previewImage == None: 
         self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * panelColorCount, sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 0, 0, 0))
       self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))

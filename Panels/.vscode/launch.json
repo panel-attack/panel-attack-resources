@@ -5,23 +5,23 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "PACCI",
+      "name": "PA",
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "PACCI JamBox"
+        "JamBoxPA"
       ]
-    }
+    },
     {
-      "name": "Crisp PACCI",
+      "name": "PA Crisp",
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "Pacci Color Blind Friendly"
+        "JamBoxPACrisp"
       ]
     }
   ]
