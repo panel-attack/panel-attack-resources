@@ -57,14 +57,13 @@ class Sheet:
     self.panelConfig = panelConfig
     self.x = 0
     self.y = -1
+    self.index = index
     self.backgroundImage = Image.open(self.panelConfig.folder + index + "background.png", mode = 'r')
     self.borderImage = Image.open(self.panelConfig.folder + index + "border.png", mode = 'r')
     self.shapeImage = Image.open(self.panelConfig.folder + index + "shape.png", mode = 'r')
     self.panelSize = self.backgroundImage.size
     self.sheetImage = Image.new('RGBA', (self.panelSize[0] * self.panelConfig.maxAnimationFrames, self.panelSize[1] * self.panelConfig.animationCount), (255, 0, 0, 0))
 
-
-  
   def startAnimation(self):
     self.x = 0 
     self.y += 1
@@ -117,17 +116,76 @@ class Sheet:
     self.addFrame(panelImage)
     self.endAnimation()
 
+  def splitTypeForIndex(self, index, shouldSplit):
+    splitType = 0
+    if shouldSplit:
+      match index:
+        case '1':
+            splitType = 1
+        case '2':
+            splitType = 2
+        case '3':
+            splitType = 1
+        case '4':
+            splitType = 1
+        case '5':
+            splitType = 2
+        case '6':
+            splitType = 2
+        case '7':
+            splitType = 1
+        case '8':
+            splitType = 2
+    return splitType
+              
   # Builds an animation with the shapes transformed by a set of animations of: xOffset, yOffset, xScale, yScale
-  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations):
+  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations, shouldSplit):
       self.startAnimation()
       for animation in shapeTransformAnimations:
+        splitType = self.splitTypeForIndex(self.index, shouldSplit)
+
+        panelImage = self.backgroundImage.copy()
         newWidth = int(animation[2] * self.panelSize[0])
         newHeight = int(animation[3] * self.panelSize[1])
-        xOffset = int(animation[0] * self.panelSize[0]) + int((self.panelSize[0] - newWidth) / 2)
-        yOffset = int(animation[1] * self.panelSize[1]) + int((self.panelSize[1] - newHeight) / 2)
-        panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
         squishedShapeImage = self.shapeImage.resize([newWidth, newHeight])
-        panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
+        if splitType == 0:
+          xOffset = int(animation[0] * self.panelSize[0]) - int(squishedShapeImage.size[0] / 2) + int(self.panelSize[0] / 2)
+          yOffset = int(animation[1] * self.panelSize[1]) - int(squishedShapeImage.size[1] / 2) + int(self.panelSize[1] / 2)
+
+          panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
+        elif splitType == 1:
+          squishedSize = squishedShapeImage.size
+          left = 0
+          middle = squishedSize[0] / 2
+          right = squishedSize[0]
+          top = 0
+          bottom = squishedSize[1]
+          splitImage = squishedShapeImage.crop((left, top, middle, bottom))
+          xOffset = int(animation[0] * self.panelSize[0]) - int(splitImage.size[0]) + int(self.panelSize[0] / 2)
+          yOffset = int(animation[1] * self.panelSize[1]) - int(splitImage.size[1] / 2) + int(self.panelSize[1] / 2)
+          panelImage.paste(splitImage, (xOffset, yOffset), splitImage)
+          splitImage = squishedShapeImage.crop((middle, top, right, bottom))
+          xOffset = -int(animation[0] * self.panelSize[0]) + int(self.panelSize[0] / 2)
+          yOffset = -int(animation[1] * self.panelSize[1]) - int(splitImage.size[1] / 2) + int(self.panelSize[1] / 2)
+          panelImage.paste(splitImage, (xOffset, yOffset), splitImage)
+        else:
+          squishedSize = squishedShapeImage.size
+          left = 0
+          right = squishedSize[0]
+          top = 0
+          middle = squishedSize[1] / 2
+          bottom = squishedSize[1]
+
+          splitImage = squishedShapeImage.crop((left, top, right, middle))
+          xOffset = int(animation[1] * self.panelSize[0]) - int(splitImage.size[0] / 2) + int(self.panelSize[0] / 2)
+          yOffset = int(animation[0] * self.panelSize[1]) - int(splitImage.size[1]) + int(self.panelSize[1] / 2)
+          panelImage.paste(splitImage, (xOffset, yOffset), splitImage)
+          splitImage = squishedShapeImage.crop((left, middle, right, bottom))
+          xOffset = -int(animation[1] * self.panelSize[0]) - int(splitImage.size[0] / 2) + int(self.panelSize[0] / 2)
+          yOffset = -int(animation[0] * self.panelSize[1]) + int(self.panelSize[1] / 2)
+          panelImage.paste(splitImage, (xOffset, yOffset), splitImage)
+        
+        panelImage = Image.alpha_composite(panelImage, self.borderImage)
         self.addFrame(panelImage)
       self.endAnimation()
 
@@ -135,7 +193,7 @@ class Sheet:
       # xOffset, yOffset, xScale, yScale
       animations = [[0, 0.03, 1.082, 0.92],
                     ]
-      self.buildAnimationWithShapeTransforms(animations)
+      self.buildAnimationWithShapeTransforms(animations, 0)
 
   def buildDimmedAnimation(self):
     self.startAnimation()
@@ -145,13 +203,10 @@ class Sheet:
     self.endAnimation()
 
   def buildDeadAnimation(self):
-    self.startAnimation()
-    panelImage = self.standardPanelImage()
-    panelImage = adjustExtremes(panelImage, 0, 140)
-    # panelImage = adjust_levels(panelImage, 0, 255)
-    self.addFrame(panelImage)
-    self.endAnimation()
-
+    # xOffset, yOffset, xScale, yScale
+    animations = [[-0.05, 0, 1.1, 1.1]]
+    self.buildAnimationWithShapeTransforms(animations, 1)
+  
   def buildLandingAnimation(self):
       # xOffset, yOffset, xScale, yScale
       animations = [[0, 0.075, 1.075, 0.85],
@@ -162,7 +217,7 @@ class Sheet:
                     [0, 0.015, 1.0125, 0.975],
                     [0, 0, 1, 1]
                     ]
-      self.buildAnimationWithShapeTransforms(animations)
+      self.buildAnimationWithShapeTransforms(animations, 0)
 
   def buildShineDangerAnimation(self):
       self.startAnimation()
@@ -215,7 +270,7 @@ class Sheet:
                     ]
       if self.panelConfig.dangerBounceReduced:
         animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1], animations)
-      self.buildAnimationWithShapeTransforms(animations)
+      self.buildAnimationWithShapeTransforms(animations, 0)
   
   def buildFlashAnimation(self):
       self.startAnimation()
