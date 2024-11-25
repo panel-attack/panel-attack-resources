@@ -82,7 +82,7 @@ class Sheet:
   def buildSheet(self, index):
 
     self.buildNormalAnimation()
-    self.buildHoveringAnimation()
+    self.buildGarbagePopHoveringAnimation()
     self.buildFallingAnimation()
     self.buildDimmedAnimation()
     self.buildDeadAnimation()
@@ -107,30 +107,13 @@ class Sheet:
     self.addFrame(panelImage)
     self.endAnimation()
 
-  def buildHoveringAnimation(self):
+  def buildGarbagePopHoveringAnimation(self):
     self.startAnimation()
     panelImage = self.standardPanelImage()
-    self.addFrame(panelImage)
-    self.endAnimation()
-
-  def buildFallingAnimation(self):
-    self.startAnimation()
-    panelImage = self.standardPanelImage()
-    self.addFrame(panelImage)
-    self.endAnimation()
-
-  def buildDimmedAnimation(self):
-    self.startAnimation()
-    panelImage = self.standardPanelImage()
-    panelImage = adjustExtremes(panelImage, 0, 150)
-    self.addFrame(panelImage)
-    self.endAnimation()
-
-  def buildDeadAnimation(self):
-    self.startAnimation()
-    panelImage = self.standardPanelImage()
-    panelImage = adjustExtremes(panelImage, 0, 140)
-    # panelImage = adjust_levels(panelImage, 0, 255)
+    panelImage = self.backgroundImage.copy()
+    panelImage = adjustExtremes(panelImage, 0, 200)
+    panelImage = Image.alpha_composite(panelImage, self.borderImage)
+    panelImage = Image.alpha_composite(panelImage, self.shapeImage)
     self.addFrame(panelImage)
     self.endAnimation()
 
@@ -147,6 +130,27 @@ class Sheet:
         panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
         self.addFrame(panelImage)
       self.endAnimation()
+
+  def buildFallingAnimation(self):
+      # xOffset, yOffset, xScale, yScale
+      animations = [[0, 0.03, 1.082, 0.92],
+                    ]
+      self.buildAnimationWithShapeTransforms(animations)
+
+  def buildDimmedAnimation(self):
+    self.startAnimation()
+    panelImage = self.standardPanelImage()
+    panelImage = adjustExtremes(panelImage, 0, 150)
+    self.addFrame(panelImage)
+    self.endAnimation()
+
+  def buildDeadAnimation(self):
+    self.startAnimation()
+    panelImage = self.standardPanelImage()
+    panelImage = adjustExtremes(panelImage, 0, 140)
+    # panelImage = adjust_levels(panelImage, 0, 255)
+    self.addFrame(panelImage)
+    self.endAnimation()
 
   def buildLandingAnimation(self):
       # xOffset, yOffset, xScale, yScale
@@ -285,6 +289,9 @@ class PanelsConfig:
         self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * panelColorCount, sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 0, 0, 0))
       self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))
 
+    fileSuffix = "@2x.png"
+    panel0Name = "panel00"
+    shutil.copyfile(self.folder + panel0Name + ".png", self.outputFolder + panel0Name + fileSuffix)
     shutil.copyfile(self.baseFolder + "/" + self.configFileName, self.outputFolder + self.configFileName)
 
     self.previewImage.show()
