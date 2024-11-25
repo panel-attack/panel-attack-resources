@@ -139,12 +139,14 @@ class Sheet:
     return splitType
               
   # Builds an animation with the shapes transformed by a set of animations of: xOffset, yOffset, xScale, yScale
-  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations, shouldSplit):
+  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations, shouldSplit, baseImage, includeBorder=True):
       self.startAnimation()
       for animation in shapeTransformAnimations:
         splitType = self.splitTypeForIndex(self.index, shouldSplit)
-
-        panelImage = self.backgroundImage.copy()
+        if baseImage == None:
+           panelImage = self.backgroundImage.copy()
+        else:
+           panelImage = baseImage.copy()
         newWidth = int(animation[2] * self.panelSize[0])
         newHeight = int(animation[3] * self.panelSize[1])
         squishedShapeImage = self.shapeImage.resize([newWidth, newHeight])
@@ -185,7 +187,8 @@ class Sheet:
           yOffset = -int(animation[0] * self.panelSize[1]) + int(self.panelSize[1] / 2)
           panelImage.paste(splitImage, (xOffset, yOffset), splitImage)
         
-        panelImage = Image.alpha_composite(panelImage, self.borderImage)
+        if includeBorder:
+          panelImage = Image.alpha_composite(panelImage, self.borderImage)
         self.addFrame(panelImage)
       self.endAnimation()
 
@@ -193,7 +196,7 @@ class Sheet:
       # xOffset, yOffset, xScale, yScale
       animations = [[0, 0.03, 1.082, 0.92],
                     ]
-      self.buildAnimationWithShapeTransforms(animations, 0)
+      self.buildAnimationWithShapeTransforms(animations, 0, None)
 
   def buildDimmedAnimation(self):
     self.startAnimation()
@@ -205,7 +208,7 @@ class Sheet:
   def buildDeadAnimation(self):
     # xOffset, yOffset, xScale, yScale
     animations = [[-0.05, 0, 1.1, 1.1]]
-    self.buildAnimationWithShapeTransforms(animations, 1)
+    self.buildAnimationWithShapeTransforms(animations, 1, None)
   
   def buildLandingAnimation(self):
       # xOffset, yOffset, xScale, yScale
@@ -217,7 +220,7 @@ class Sheet:
                     [0, 0.015, 1.0125, 0.975],
                     [0, 0, 1, 1]
                     ]
-      self.buildAnimationWithShapeTransforms(animations, 0)
+      self.buildAnimationWithShapeTransforms(animations, 0, None)
 
   def buildShineDangerAnimation(self):
       self.startAnimation()
@@ -270,7 +273,7 @@ class Sheet:
                     ]
       if self.panelConfig.dangerBounceReduced:
         animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1], animations)
-      self.buildAnimationWithShapeTransforms(animations, 0)
+      self.buildAnimationWithShapeTransforms(animations, 0, None)
   
   def buildFlashAnimation(self):
       self.startAnimation()
@@ -297,24 +300,15 @@ class Sheet:
       self.endAnimation()
 
   def buildPopAnimation(self):
-      self.startAnimation()
       multiplier = 1
-      multiplierIncrement = 0.2
-      multiplierDecrement = 0.3
+      multiplierDecrement = 0.18
+      animations = []
       for x in range(0, self.panelConfig.popAnimationCount):
-        if x >= 2:
-          multiplier -= multiplierDecrement
-        else:
-          multiplier += multiplierIncrement
-        panelImage = Image.new('RGBA', self.panelSize, (255, 0, 0, 0))
-        newSize = int(self.panelSize[0]*multiplier)
-        resizedShapeImage = self.shapeImage.resize((newSize, newSize))
-        resizedShapeImageSize = resizedShapeImage.size
-        offset = -1 * int((resizedShapeImageSize[0]-self.panelSize[0])/2)
-        panelImage.paste(resizedShapeImage, (offset, offset), resizedShapeImage)
-        self.addFrame(panelImage)
-      self.endAnimation()
-
+        offset = x * -0.1
+        animations.append([offset, 0, multiplier, multiplier])
+        multiplier -= multiplierDecrement
+      baseImage = Image.new('RGBA', self.panelSize, (255, 0, 0, 0))
+      self.buildAnimationWithShapeTransforms(animations, 1, baseImage, False)
 
 class PanelsConfig:
   def __init__(self, baseFolder):
