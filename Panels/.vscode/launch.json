@@ -5,6 +5,16 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Preview Panels",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "~/Library/Application Support/Panel Attack/panels/"
+      ]
+    },
+    {
       "name": "PA",
       "type": "debugpy",
       "request": "launch",
