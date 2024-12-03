@@ -93,7 +93,6 @@ class Sheet:
     self.buildFlashAnimation()
     self.buildFaceAnimation()
     self.buildPopAnimation()
-    self.sheetImage.save(self.panelConfig.outputFolder + "panel-" + index + "@2x.png"),(0,0)
 
   def standardPanelImage(self):
     panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
@@ -310,11 +309,10 @@ class Sheet:
       baseImage = Image.new('RGBA', self.panelSize, (255, 0, 0, 0))
       self.buildAnimationWithShapeTransforms(animations, 1, baseImage, False)
 
-class PanelsConfig:
+class Panels:
   def __init__(self, baseFolder):
     self.baseFolder = baseFolder
     self.folder = self.baseFolder + "/RawImages/"
-    self.outputFolder = self.baseFolder + "/OutputPanels/"
     self.configFileName = "config.json"
     self.landingAnimationCount = 7
     self.popAnimationCount = 6
@@ -324,8 +322,11 @@ class PanelsConfig:
     self.dangerBounceReduced = True
     self.previewImage = None
 
-  def createSheets(self):
-    os.makedirs(os.path.dirname(self.outputFolder), exist_ok=True)
+  def createSheets(self, saveDirectory):
+    baseFolder = os.path.normpath(self.baseFolder)
+    folderName = baseFolder.split(os.sep)[-1]
+    outputFolder = saveDirectory + folderName + "/"
+    os.makedirs(os.path.dirname(outputFolder), exist_ok=True)
 
     panelColorCount = 9
     for i in range(1, panelColorCount):
@@ -337,13 +338,14 @@ class PanelsConfig:
       if self.previewImage == None: 
         self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * panelColorCount, sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 0, 0, 0))
       self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))
+      sheet.sheetImage.save(outputFolder + "panel-" + index + "@2x.png"),(0,0)
 
     fileSuffix = "@2x.png"
     panel0Name = "panel00"
-    shutil.copyfile(self.folder + panel0Name + ".png", self.outputFolder + panel0Name + fileSuffix)
-    shutil.copyfile(self.baseFolder + "/" + self.configFileName, self.outputFolder + self.configFileName)
+    shutil.copyfile(self.folder + panel0Name + ".png", outputFolder + panel0Name + fileSuffix)
+    shutil.copyfile(self.baseFolder + "/" + self.configFileName, outputFolder + self.configFileName)
 
     self.previewImage.show()
 
-panelConfig = PanelsConfig(sys.argv[1])
-panelConfig.createSheets()
+panelConfig = Panels(sys.argv[1])
+panelConfig.createSheets(sys.argv[2])

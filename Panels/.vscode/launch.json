@@ -15,24 +15,37 @@
       ]
     },
     {
-      "name": "PA",
+      "name": "JamBox Crisp PA",
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "JamBoxPA"
+        "JamBox Crisp PA",
+        "~/Library/Application Support/Panel Attack/panels/JamBox/"
       ]
     },
     {
-      "name": "PA Crisp",
+      "name": "JamBox Crisp Original",
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "JamBoxPACrisp"
+        "JamBox Crisp Original",
+        "~/Library/Application Support/Panel Attack/panels/JamBox/"
       ]
-    }
+    },
+    {
+      "name": "JamBox Gradient Original",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "JamBox Gradient Original",
+        "~/Library/Application Support/Panel Attack/panels/JamBox/"
+      ]
+    },
   ]
 }
