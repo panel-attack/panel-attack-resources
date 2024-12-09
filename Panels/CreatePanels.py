@@ -6,6 +6,58 @@ from PIL import Image, ImageEnhance
 import numpy as numpy
 import blend_modes as blend_modes
 
+def rgb_to_hsv(rgb):
+    # Translated from source of colorsys.rgb_to_hsv
+    # r,g,b should be a numpy arrays with values between 0 and 255
+    # rgb_to_hsv returns an array of floats between 0.0 and 1.0.
+    rgb = rgb.astype('float')
+    hsv = numpy.zeros_like(rgb)
+    # in case an RGBA array was passed, just copy the A channel
+    hsv[..., 3:] = rgb[..., 3:]
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    maxc = numpy.max(rgb[..., :3], axis=-1)
+    minc = numpy.min(rgb[..., :3], axis=-1)
+    hsv[..., 2] = maxc
+    mask = maxc != minc
+    hsv[mask, 1] = (maxc - minc)[mask] / maxc[mask]
+    rc = numpy.zeros_like(r)
+    gc = numpy.zeros_like(g)
+    bc = numpy.zeros_like(b)
+    rc[mask] = (maxc - r)[mask] / (maxc - minc)[mask]
+    gc[mask] = (maxc - g)[mask] / (maxc - minc)[mask]
+    bc[mask] = (maxc - b)[mask] / (maxc - minc)[mask]
+    hsv[..., 0] = numpy.select(
+        [r == maxc, g == maxc], [bc - gc, 2.0 + rc - bc], default=4.0 + gc - rc)
+    hsv[..., 0] = (hsv[..., 0] / 6.0) % 1.0
+    return hsv
+
+def hsv_to_rgb(hsv):
+    # Translated from source of colorsys.hsv_to_rgb
+    # h,s should be a numpy arrays with values between 0.0 and 1.0
+    # v should be a numpy array with values between 0.0 and 255.0
+    # hsv_to_rgb returns an array of uints between 0 and 255.
+    rgb = numpy.empty_like(hsv)
+    rgb[..., 3:] = hsv[..., 3:]
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    i = (h * 6.0).astype('uint8')
+    f = (h * 6.0) - i
+    p = v * (1.0 - s)
+    q = v * (1.0 - s * f)
+    t = v * (1.0 - s * (1.0 - f))
+    i = i % 6
+    conditions = [s == 0.0, i == 1, i == 2, i == 3, i == 4, i == 5]
+    rgb[..., 0] = numpy.select(conditions, [v, q, p, p, t, v], default=v)
+    rgb[..., 1] = numpy.select(conditions, [v, v, v, q, p, p], default=t)
+    rgb[..., 2] = numpy.select(conditions, [v, p, t, v, v, q], default=p)
+    return rgb.astype('uint8')
+
+
+def shiftImageHue(arr,hout):
+    hsv=rgb_to_hsv(arr)
+    hsv[...,0]=hout
+    rgb=hsv_to_rgb(hsv)
+    return rgb
+
 def blendImages(background, foreground, opacity, functionToRun):
   background_img = numpy.array(background)  # Inputs to blend_modes need to be numpy arrays.
   background_img_float = background_img.astype(float)  # Inputs to blend_modes need to be floats.
@@ -109,9 +161,9 @@ class Sheet:
     self.startAnimation()
     panelImage = self.standardPanelImage()
     panelImage = self.backgroundImage.copy()
-    panelImage = adjustExtremes(panelImage, 0, 200)
-    panelImage = Image.alpha_composite(panelImage, self.borderImage)
-    panelImage = Image.alpha_composite(panelImage, self.shapeImage)
+    panelImage = adjustExtremes(panelImage, 0, 150)
+    panelImage = Image.alpha_composite(panelImage, adjustExtremes(self.borderImage, 0, 255))
+    panelImage = Image.alpha_composite(panelImage, adjustExtremes(self.shapeImage, 0, 220))
     self.addFrame(panelImage)
     self.endAnimation()
 
@@ -333,12 +385,19 @@ class Panels:
       index = str(i)
       sheet = Sheet(self, index)
       sheet.buildSheet(index)
-      if i == 2:
-        sheet.sheetImage.show()
+      # if i == 2:
+        # sheet.sheetImage.show()
       if self.previewImage == None: 
         self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * panelColorCount, sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 0, 0, 0))
       self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))
-      sheet.sheetImage.save(outputFolder + "panel-" + index + "@2x.png"),(0,0)
+      sheet.sheetImage.save(outputFolder + "panel-" + index + "@2x.png")
+
+      if i < 8:
+        alternateColorsFolder = outputFolder + "/Alternate Colors/"
+        os.makedirs(os.path.dirname(alternateColorsFolder), exist_ok=True)
+        for hue in numpy.arange(0, 1, 0.025):
+          coloredSheet = Image.fromarray(shiftImageHue(numpy.array(sheet.sheetImage), hue), 'RGBA')
+          coloredSheet.save(alternateColorsFolder + "panel-" + index + "-" + str(int(hue * 100)) + "@2x.png")
 
     fileSuffix = "@2x.png"
     panel0Name = "panel00"

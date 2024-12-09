@@ -110,7 +110,7 @@ class PanelsConfig:
     self.panelFolders = []
     self.currentRow = 0
     self.panelSize = [96, 96]
-    self.panelNameWidth = 400
+    self.panelNameWidth = 460
 
   def addPanelsFromDirectory(self, directory):
     print(directory)
