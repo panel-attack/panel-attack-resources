@@ -372,6 +372,7 @@ class Panels:
     self.animationCount = 10
     self.useDangerBounce = True
     self.dangerBounceReduced = True
+    self.makeAlternates = False
     self.previewImage = None
 
   def createSheets(self, saveDirectory):
@@ -392,7 +393,7 @@ class Panels:
       self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))
       sheet.sheetImage.save(outputFolder + "panel-" + index + "@2x.png")
 
-      if i < 8:
+      if self.makeAlternates and i < 8:
         alternateColorsFolder = outputFolder + "/Alternate Colors/"
         os.makedirs(os.path.dirname(alternateColorsFolder), exist_ok=True)
         for hue in numpy.arange(0, 1, 0.025):
