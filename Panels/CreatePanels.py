@@ -2,61 +2,77 @@
 import os
 import sys
 import shutil
+import colorsys
 from PIL import Image, ImageEnhance
 import numpy as numpy
 import blend_modes as blend_modes
 
-def rgb_to_hsv(rgb):
-    # Translated from source of colorsys.rgb_to_hsv
-    # r,g,b should be a numpy arrays with values between 0 and 255
-    # rgb_to_hsv returns an array of floats between 0.0 and 1.0.
-    rgb = rgb.astype('float')
-    hsv = numpy.zeros_like(rgb)
-    # in case an RGBA array was passed, just copy the A channel
-    hsv[..., 3:] = rgb[..., 3:]
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    maxc = numpy.max(rgb[..., :3], axis=-1)
-    minc = numpy.min(rgb[..., :3], axis=-1)
-    hsv[..., 2] = maxc
-    mask = maxc != minc
-    hsv[mask, 1] = (maxc - minc)[mask] / maxc[mask]
-    rc = numpy.zeros_like(r)
-    gc = numpy.zeros_like(g)
-    bc = numpy.zeros_like(b)
-    rc[mask] = (maxc - r)[mask] / (maxc - minc)[mask]
-    gc[mask] = (maxc - g)[mask] / (maxc - minc)[mask]
-    bc[mask] = (maxc - b)[mask] / (maxc - minc)[mask]
-    hsv[..., 0] = numpy.select(
-        [r == maxc, g == maxc], [bc - gc, 2.0 + rc - bc], default=4.0 + gc - rc)
-    hsv[..., 0] = (hsv[..., 0] / 6.0) % 1.0
-    return hsv
+import numpy as np
+import colorsys
 
-def hsv_to_rgb(hsv):
-    # Translated from source of colorsys.hsv_to_rgb
-    # h,s should be a numpy arrays with values between 0.0 and 1.0
-    # v should be a numpy array with values between 0.0 and 255.0
-    # hsv_to_rgb returns an array of uints between 0 and 255.
-    rgb = numpy.empty_like(hsv)
-    rgb[..., 3:] = hsv[..., 3:]
-    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
-    i = (h * 6.0).astype('uint8')
-    f = (h * 6.0) - i
-    p = v * (1.0 - s)
-    q = v * (1.0 - s * f)
-    t = v * (1.0 - s * (1.0 - f))
-    i = i % 6
-    conditions = [s == 0.0, i == 1, i == 2, i == 3, i == 4, i == 5]
-    rgb[..., 0] = numpy.select(conditions, [v, q, p, p, t, v], default=v)
-    rgb[..., 1] = numpy.select(conditions, [v, v, v, q, p, p], default=t)
-    rgb[..., 2] = numpy.select(conditions, [v, p, t, v, v, q], default=p)
-    return rgb.astype('uint8')
+def rgb_to_hsl(rgb):
+    """Convert RGB to HSL.
 
+    Args:
+        rgb (numpy.ndarray): Array of RGB values, shape (N, 3), where R, G, B are in [0, 255].
 
-def shiftImageHue(arr,hout):
-    hsv=rgb_to_hsv(arr)
-    hsv[...,0]=hout
-    rgb=hsv_to_rgb(hsv)
-    return rgb
+    Returns:
+        numpy.ndarray: Array of HSL values, shape (N, 3),
+                       where H is in [0, 360], S and L are in [0, 1].
+    """
+    rgb = rgb.astype(float) / 255.0  # Normalize RGB to [0, 1]
+    hsl = numpy.array([colorsys.rgb_to_hls(r, g, b) for r, g, b in rgb])  # Convert to HSL
+    h, l, s = numpy.transpose(hsl)
+    h = h * 360  # Scale hue to [0, 360]
+    return numpy.column_stack((h, s, l))
+
+def hsl_to_rgb(hsl):
+    """Convert HSL to RGB.
+
+    Args:
+        hsl (numpy.ndarray): Array of HSL values, shape (N, 3),
+                             where H is in [0, 360], S and L are in [0, 1].
+
+    Returns:
+        numpy.ndarray: Array of RGB values, shape (N, 3), where R, G, B are in [0, 255].
+    """
+    hsl[:, 0] = hsl[:, 0] / 360.0  # Scale hue to [0, 1]
+    rgb = numpy.array([colorsys.hls_to_rgb(h, l, s) for h, s, l in hsl])  # Convert to RGB
+    return (rgb * 255).astype(numpy.uint8)  # Scale RGB back to [0, 255]
+
+def modify_hue_and_lightness(rgb, hue, saturation, lightness_factor):
+    """Modify the hue and lightness of an RGB array.
+
+    Args:
+        rgb (numpy.ndarray): Input RGB array, shape (N, 3).
+        hue
+        lightness_factor (float): Multiplicative factor to adjust lightness.
+
+    Returns:
+        numpy.ndarray: Modified RGB array, shape (N, 3).
+    """
+    hsl = rgb_to_hsl(rgb)  # Convert to HSL
+    h, s, l = numpy.transpose(hsl)
+    h.fill(hue % 360)
+    l = numpy.clip(l * lightness_factor, 0, 1)  # Adjust lightness and clip to [0, 1]
+    s.fill(saturation)
+    hsl_modified = numpy.column_stack((h, s, l))
+    return hsl_to_rgb(hsl_modified)  # Convert back to RGB
+
+def shiftImageHueNumpy(rgba_input, hue, saturation, lightnessFactor):
+  rgbaShaped = rgba_input.reshape((-1,4))
+  r, g, b, alpha = numpy.transpose(rgbaShaped)
+  rgb = numpy.column_stack((r, g, b))
+  hue360 = hue * 360
+  rgb_outputShaped = modify_hue_and_lightness(rgb, hue360, saturation, lightnessFactor)
+  r2, g2, b2 = numpy.transpose(rgb_outputShaped)
+  rgbaChanged = numpy.column_stack((r2, g2, b2, alpha))
+  rgba_output = rgbaChanged.reshape((rgba_input.shape[0], rgba_input.shape[1], 4))
+  return rgba_output
+
+def shiftImageHue(image, hue, saturation, lightnessFactor):
+  resultImage = Image.fromarray(shiftImageHueNumpy(numpy.array(image), hue, saturation, lightnessFactor), 'RGBA')
+  return resultImage
 
 def blendImages(background, foreground, opacity, functionToRun):
   background_img = numpy.array(background)  # Inputs to blend_modes need to be numpy arrays.
@@ -105,14 +121,15 @@ def adjust_levels(image, black_point=0, white_point=255):
     return Image.merge("RGBA", (r, g, b, a))
 
 class Sheet:
-  def __init__(self, panelConfig, index):
+  def __init__(self, panelConfig, index, hue, saturation, lightnessFactor):
     self.panelConfig = panelConfig
     self.x = 0
     self.y = -1
     self.index = index
-    self.backgroundImage = Image.open(self.panelConfig.folder + index + "background.png", mode = 'r')
-    self.borderImage = Image.open(self.panelConfig.folder + index + "border.png", mode = 'r')
-    self.shapeImage = Image.open(self.panelConfig.folder + index + "shape.png", mode = 'r')
+    self.hue = hue
+    self.saturation = saturation
+    self.lightnessFactor = lightnessFactor
+    self.buildPanelBaseImages()
     self.panelSize = self.backgroundImage.size
     self.sheetImage = Image.new('RGBA', (self.panelSize[0] * self.panelConfig.maxAnimationFrames, self.panelSize[1] * self.panelConfig.animationCount), (255, 0, 0, 0))
 
@@ -131,7 +148,6 @@ class Sheet:
     return
   
   def buildSheet(self, index):
-
     self.buildNormalAnimation()
     self.buildGarbagePopHoveringAnimation()
     self.buildFallingAnimation()
@@ -289,19 +305,19 @@ class Sheet:
       #   self.addFrame(panelImage)
 
       alphas = []
-      min = 150
-      max = 255
+      min = 40
+      max = 100
       step = int((max - min) / 5)
-      for a in numpy.arange(min, max, step):
-        alphas.append(a)
       for a in numpy.arange(max, min, -step):
+        alphas.append(a)
+      for a in numpy.arange(min, max, step):
         alphas.append(a)
 
       for alpha in alphas:
         panelImage = self.backgroundImage.copy()
 
         shineOffsetImage = Image.new('RGBA', self.panelSize, (255, 255, 255, alpha))
-        blendedShineImage = blendImages(self.borderImage, shineOffsetImage, 0.5, blend_modes.overlay)
+        blendedShineImage = blendImages(self.borderImage, shineOffsetImage, 1, blend_modes.lighten_only)
 
         panelImage = Image.alpha_composite(panelImage, blendedShineImage)
         panelImage = Image.alpha_composite(panelImage, self.shapeImage)
@@ -311,15 +327,16 @@ class Sheet:
 
   def buildBounceDangerAnimation(self):
       # xOffset, yOffset, xScale, yScale
-      animations = [[0, 0, 1, 1],
+      animations = [
+                    [0, 0.09, 1.1, 0.8],
+                    [0, 0.06, 1.05, 0.9],
+                    [0, 0, 1, 1],
                     [0, -0.02, 1, 1],
                     [0, -0.04, 1, 1],
                     [0, -0.06, 1, 1],
                     [0, -0.04, 1, 1],
                     [0, -0.02, 1, 1],
                     [0, 0, 1, 1],
-                    [0, 0.06, 1.05, 0.9],
-                    [0, 0.09, 1.1, 0.8],
                     [0, 0.06, 1.05, 0.9],
                     ]
       if self.panelConfig.dangerBounceReduced:
@@ -361,8 +378,16 @@ class Sheet:
       baseImage = Image.new('RGBA', self.panelSize, (255, 0, 0, 0))
       self.buildAnimationWithShapeTransforms(animations, 1, baseImage, False)
 
+  def buildPanelBaseImages(self):
+      self.backgroundImage = Image.open(self.panelConfig.folder + self.index + "background.png", mode = 'r')
+      self.backgroundImage = shiftImageHue(self.backgroundImage, self.hue, self.saturation, self.lightnessFactor)
+      self.borderImage = Image.open(self.panelConfig.folder + self.index + "border.png", mode = 'r')
+      self.borderImage = shiftImageHue(self.borderImage, self.hue, self.saturation, self.lightnessFactor)
+      self.shapeImage = Image.open(self.panelConfig.folder + self.index + "shape.png", mode = 'r')
+      self.shapeImage = shiftImageHue(self.shapeImage, self.hue, self.saturation, self.lightnessFactor)
+
 class Panels:
-  def __init__(self, baseFolder):
+  def __init__(self, baseFolder, panelSettings):
     self.baseFolder = baseFolder
     self.folder = self.baseFolder + "/RawImages/"
     self.configFileName = "config.json"
@@ -370,10 +395,10 @@ class Panels:
     self.popAnimationCount = 6
     self.maxAnimationFrames = 10
     self.animationCount = 10
-    self.useDangerBounce = True
+    self.useDangerBounce = False
     self.dangerBounceReduced = True
-    self.makeAlternates = False
     self.previewImage = None
+    self.panelSettings = panelSettings
 
   def createSheets(self, saveDirectory):
     baseFolder = os.path.normpath(self.baseFolder)
@@ -381,24 +406,21 @@ class Panels:
     outputFolder = saveDirectory + folderName + "/"
     os.makedirs(os.path.dirname(outputFolder), exist_ok=True)
 
-    panelColorCount = 9
-    for i in range(1, panelColorCount):
+    panelColorCount = 8
+    for i in range(1, panelColorCount+1):
       index = str(i)
-      sheet = Sheet(self, index)
+      hue = self.panelSettings[i-1][0]
+      saturation = self.panelSettings[i-1][1]
+      lightnessFactor = self.panelSettings[i-1][2]
+      sheet = Sheet(self, index, hue, saturation, lightnessFactor)
       sheet.buildSheet(index)
-      # if i == 2:
+      # if i == 1:
         # sheet.sheetImage.show()
+        # sys.exit()
       if self.previewImage == None: 
-        self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * panelColorCount, sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 0, 0, 0))
+        self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * (panelColorCount), sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 0, 0, 0))
       self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))
       sheet.sheetImage.save(outputFolder + "panel-" + index + "@2x.png")
-
-      if self.makeAlternates and i < 8:
-        alternateColorsFolder = outputFolder + "/Alternate Colors/"
-        os.makedirs(os.path.dirname(alternateColorsFolder), exist_ok=True)
-        for hue in numpy.arange(0, 1, 0.025):
-          coloredSheet = Image.fromarray(shiftImageHue(numpy.array(sheet.sheetImage), hue), 'RGBA')
-          coloredSheet.save(alternateColorsFolder + "panel-" + index + "-" + str(int(hue * 100)) + "@2x.png")
 
     fileSuffix = "@2x.png"
     panel0Name = "panel00"
@@ -407,5 +429,38 @@ class Panels:
 
     self.previewImage.show()
 
-panelConfig = Panels(sys.argv[1])
-panelConfig.createSheets(sys.argv[2])
+baseFolder = sys.argv[1]
+saveFolder = sys.argv[2]
+panelSettings = []
+# Classic
+panelSettings += [[[359 / 360.0, 1.00, 0.85],
+                  [120 / 360.0, 1.00, 0.85],
+                  [180 / 360.0, 1.00, 0.86],
+                  [60  / 360.0, 1.00, 0.86],
+                  [300 / 360.0, 1.00, 0.93],
+                  [225 / 360.0, 1.00, 1.071],
+                  [19  / 360.0, 1.00, 1.153],
+                  [0   / 360.0, 0.00, 1.38],
+                 ]]
+# JamBox
+panelSettings += [[[0   / 360.0, 1, 1],
+                  [126 / 360.0, 1, 1.1],
+                  [194 / 360.0, 1, 1],
+                  [67  / 360.0, 1, 0.97],
+                  [326 / 360.0, 1, 1.07],
+                  [237 / 360.0, 1, 0.90],
+                  [26  / 360.0, 1, 1],
+                  [0   / 360.0, 0.00, 1.38],
+                  ]]
+# PACCI Classic
+panelSettings += [[[6   / 360.0, 1.00, 1.08],
+                   [75  / 360.0, 0.70, 0.90],
+                   [206 / 360.0, 0.90, 1.08],
+                   [48  / 360.0, 0.79, 1.19],
+                   [304 / 360.0, 0.60, 1.18],
+                   [35  / 360.0, 0.91, 1.04],
+                   [359 / 360.0, 0.34, 0.97],
+                   [0   / 360.0, 0.00, 1.38],
+                  ]]
+panelConfig = Panels(baseFolder, panelSettings[1])
+panelConfig.createSheets(saveFolder)
