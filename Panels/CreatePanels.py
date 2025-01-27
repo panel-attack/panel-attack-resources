@@ -1,4 +1,5 @@
-#brew install pillow
+#pip3 install pillow
+#pip3 install blend_modes
 import os
 import sys
 import shutil
@@ -6,9 +7,6 @@ import colorsys
 from PIL import Image, ImageEnhance
 import numpy as numpy
 import blend_modes as blend_modes
-
-import numpy as np
-import colorsys
 
 def rgb_to_hsl(rgb):
     """Convert RGB to HSL.
@@ -157,7 +155,8 @@ class Sheet:
     if self.panelConfig.useDangerBounce:
       self.buildBounceDangerAnimation()
     else:
-      self.buildShineDangerAnimation()
+      self.buildPulseDangerAnimation()
+      # self.buildShineDangerAnimation()
     self.buildFlashAnimation()
     self.buildFaceAnimation()
     self.buildPopAnimation()
@@ -206,9 +205,10 @@ class Sheet:
     return splitType
               
   # Builds an animation with the shapes transformed by a set of animations of: xOffset, yOffset, xScale, yScale
-  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations, shouldSplit, baseImage, includeBorder=True):
+  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations, shouldSplit, baseImage=None, overlayImage=None):
       self.startAnimation()
       for animation in shapeTransformAnimations:
+        assert(len(animation) == 5)
         splitType = self.splitTypeForIndex(self.index, shouldSplit)
         if baseImage == None:
            panelImage = self.backgroundImage.copy()
@@ -221,7 +221,10 @@ class Sheet:
           xOffset = int(animation[0] * self.panelSize[0]) - int(squishedShapeImage.size[0] / 2) + int(self.panelSize[0] / 2)
           yOffset = int(animation[1] * self.panelSize[1]) - int(squishedShapeImage.size[1] / 2) + int(self.panelSize[1] / 2)
 
-          panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
+          blendImage = Image.new('RGBA', self.panelSize, (255, 255, 255, 0))
+          blendImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
+          panelImage = blendImages(panelImage, blendImage, animation[4], blend_modes.normal)
+          # panelImage.paste(squishedShapeImage, (xOffset, yOffset), squishedShapeImage)
         elif splitType == 1:
           squishedSize = squishedShapeImage.size
           left = 0
@@ -254,14 +257,15 @@ class Sheet:
           yOffset = -int(animation[0] * self.panelSize[1]) + int(self.panelSize[1] / 2)
           panelImage.paste(splitImage, (xOffset, yOffset), splitImage)
         
-        if includeBorder:
-          panelImage = Image.alpha_composite(panelImage, self.borderImage)
+        if overlayImage == None:
+           overlayImage = self.borderImage.copy()
+        panelImage = Image.alpha_composite(panelImage, overlayImage)
         self.addFrame(panelImage)
       self.endAnimation()
 
   def buildFallingAnimation(self):
-      # xOffset, yOffset, xScale, yScale
-      animations = [[0, 0.03, 1.082, 0.92],
+      # xOffset, yOffset, xScale, yScale, alpha
+      animations = [[0, 0.03, 1.082, 0.92, 1],
                     ]
       self.buildAnimationWithShapeTransforms(animations, 0, None)
 
@@ -273,21 +277,44 @@ class Sheet:
     self.endAnimation()
 
   def buildDeadAnimation(self):
-    # xOffset, yOffset, xScale, yScale
-    animations = [[-0.05, 0, 1.1, 1.1]]
+    # xOffset, yOffset, xScale, yScale, alpha
+    animations = [[-0.05, 0, 1.1, 1.1, 1]]
     self.buildAnimationWithShapeTransforms(animations, 1, None)
   
   def buildLandingAnimation(self):
-      # xOffset, yOffset, xScale, yScale
-      animations = [[0, 0.075, 1.075, 0.85],
-                    [0, 0.09, 1.1, 0.8],
-                    [0, 0.075, 1.075, 0.85],
-                    [0, 0.06, 1.05, 0.9],
-                    [0, 0.03, 1.025, 0.95],
-                    [0, 0.015, 1.0125, 0.975],
-                    [0, 0, 1, 1]
+      # xOffset, yOffset, xScale, yScale, alpha
+      animations = [[0, 0.075, 1.075, 0.85, 1],
+                    [0, 0.09, 1.1, 0.8, 1],
+                    [0, 0.075, 1.075, 0.85, 1],
+                    [0, 0.06, 1.05, 0.9, 1],
+                    [0, 0.03, 1.025, 0.95, 1],
+                    [0, 0.015, 1.0125, 0.975, 1],
+                    [0, 0, 1, 1, 1]
                     ]
       self.buildAnimationWithShapeTransforms(animations, 0, None)
+
+  def buildPulseDangerAnimation(self):
+      # xOffset, yOffset, xScale, yScale, alpha
+      frameCount = 10
+      multiplier = 1
+      multiplierIncrement = 0.2 / frameCount
+      alpha = 1
+      alphaIncrement = -0.05
+      animations = []
+      for x in range(0, frameCount):
+        animations.append([0, 0, multiplier, multiplier, alpha])
+        multiplier += multiplierIncrement
+        multiplierIncrement = multiplierIncrement * 1.4
+        alpha = max(alphaIncrement + alpha, 0)
+        alphaIncrement = alphaIncrement * 1.2
+
+      for x in range(0, 3):
+        last_element = animations.pop()
+        animations.insert(0, last_element)
+      
+      overlayImage = self.shapeImage.copy()
+      overlayImage = Image.alpha_composite(overlayImage, self.borderImage)
+      self.buildAnimationWithShapeTransforms(animations, 0, None, overlayImage)
 
   def buildShineDangerAnimation(self):
       self.startAnimation()
@@ -326,21 +353,21 @@ class Sheet:
       self.endAnimation()
 
   def buildBounceDangerAnimation(self):
-      # xOffset, yOffset, xScale, yScale
+      # xOffset, yOffset, xScale, yScale, alpha
       animations = [
-                    [0, 0.09, 1.1, 0.8],
-                    [0, 0.06, 1.05, 0.9],
-                    [0, 0, 1, 1],
-                    [0, -0.02, 1, 1],
-                    [0, -0.04, 1, 1],
-                    [0, -0.06, 1, 1],
-                    [0, -0.04, 1, 1],
-                    [0, -0.02, 1, 1],
-                    [0, 0, 1, 1],
-                    [0, 0.06, 1.05, 0.9],
+                    [0, 0.09, 1.1, 0.8, 1],
+                    [0, 0.06, 1.05, 0.9, 1],
+                    [0, 0, 1, 1, 1],
+                    [0, -0.02, 1, 1, 1],
+                    [0, -0.04, 1, 1, 1],
+                    [0, -0.06, 1, 1, 1],
+                    [0, -0.04, 1, 1, 1],
+                    [0, -0.02, 1, 1, 1],
+                    [0, 0, 1, 1, 1],
+                    [0, 0.06, 1.05, 0.9, 1],
                     ]
       if self.panelConfig.dangerBounceReduced:
-        animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1], animations)
+        animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1, animation[4]], animations)
       self.buildAnimationWithShapeTransforms(animations, 0, None)
   
   def buildFlashAnimation(self):
@@ -373,10 +400,11 @@ class Sheet:
       animations = []
       for x in range(0, self.panelConfig.popAnimationCount):
         offset = x * -0.1
-        animations.append([offset, 0, multiplier, multiplier])
+        animations.append([offset, 0, multiplier, multiplier, 1])
         multiplier -= multiplierDecrement
       baseImage = Image.new('RGBA', self.panelSize, (255, 0, 0, 0))
-      self.buildAnimationWithShapeTransforms(animations, 1, baseImage, False)
+      overlayImage = Image.new('RGBA', self.panelSize, (255, 0, 0, 0))
+      self.buildAnimationWithShapeTransforms(animations, 1, baseImage, overlayImage)
 
   def buildPanelBaseImages(self):
       self.backgroundImage = Image.open(self.panelConfig.folder + self.index + "background.png", mode = 'r')
@@ -395,7 +423,7 @@ class Panels:
     self.popAnimationCount = 6
     self.maxAnimationFrames = 10
     self.animationCount = 10
-    self.useDangerBounce = False
+    self.useDangerBounce = True
     self.dangerBounceReduced = True
     self.previewImage = None
     self.panelSettings = panelSettings
@@ -414,8 +442,8 @@ class Panels:
       lightnessFactor = self.panelSettings[i-1][2]
       sheet = Sheet(self, index, hue, saturation, lightnessFactor)
       sheet.buildSheet(index)
-      # if i == 1:
-        # sheet.sheetImage.show()
+      if i == 1:
+        sheet.sheetImage.show()
         # sys.exit()
       if self.previewImage == None: 
         self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * (panelColorCount), sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 0, 0, 0))
