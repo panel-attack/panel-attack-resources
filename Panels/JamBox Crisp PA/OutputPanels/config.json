@@ -1,5 +1,5 @@
 {
-  "id":"jambox-pa",
+  "id":"jambox-crisp-pa",
   "type": "sheet",
   "animationConfig": {
     "normal": { "row": 1, "frames": 1 },
@@ -10,7 +10,7 @@
     "dimmed": { "row": 4, "frames": 1 },
     "dead": { "row": 5, "frames": 1 },
     "landing": { "row": 6, "durationPerFrame": 1, "frames": 7 },
-    "danger": { "row": 7, "durationPerFrame": 2, "frames": 10 },
+    "danger": { "row": 7, "durationPerFrame": 3, "frames": 10 },
     "flash": { "row": 8, "durationPerFrame": 2, "frames": 2 },
     "face": { "row": 9, "frames": 1 },
     "popping": { "row": 10, "durationPerFrame": 1, "frames": 6 }
