@@ -160,6 +160,7 @@ class Sheet:
     self.buildFlashAnimation()
     self.buildFaceAnimation()
     self.buildPopAnimation()
+    self.buildDangerStopAnimation()
 
   def standardPanelImage(self):
     panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
@@ -205,15 +206,18 @@ class Sheet:
     return splitType
               
   # Builds an animation with the shapes transformed by a set of animations of: xOffset, yOffset, xScale, yScale
-  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations, shouldSplit, baseImage=None, shapeImage=None, overlayImage=None):
+  def buildAnimationWithShapeTransforms(self, shapeTransformAnimations, shouldSplit, baseImage=None, shapeImage=None, overlayImage=None, firstOverlayImage=None):
       self.startAnimation()
+      currentBaseImage = firstOverlayImage
       for animation in shapeTransformAnimations:
         assert(len(animation) == 5)
         splitType = self.splitTypeForIndex(self.index, shouldSplit)
-        if baseImage == None:
-           panelImage = self.backgroundImage.copy()
-        else:
-           panelImage = baseImage.copy()
+        if currentBaseImage == None:
+          if baseImage == None:
+           currentBaseImage = self.backgroundImage
+          else:
+           currentBaseImage = baseImage
+        panelImage = currentBaseImage.copy()
         if shapeImage == None:
            shapeImage = self.shapeImage.copy()
         newWidth = int(animation[2] * self.panelSize[0])
@@ -262,6 +266,7 @@ class Sheet:
            overlayImage = self.borderImage.copy()
         panelImage = Image.alpha_composite(panelImage, overlayImage)
         self.addFrame(panelImage)
+        currentBaseImage = None
       self.endAnimation()
 
   def buildFallingAnimation(self):
@@ -368,8 +373,31 @@ class Sheet:
                     ]
       if self.panelConfig.dangerBounceReduced:
         animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1, animation[4]], animations)
-      self.buildAnimationWithShapeTransforms(animations, 0)
+      baseImage = Image.open(self.panelConfig.folder + "panic.png", mode = 'r')
+      baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
+      self.buildAnimationWithShapeTransforms(animations, 0, baseImage)
   
+  def buildDangerStopAnimation(self):
+      # xOffset, yOffset, xScale, yScale, alpha
+      animations = [
+                    [0, 0.09, 1.1, 0.8, 1],
+                    [0, 0.06, 1.05, 0.9, 1],
+                    [0, 0, 1, 1, 1],
+                    [0, -0.02, 1, 1, 1],
+                    [0, -0.04, 1, 1, 1],
+                    [0, -0.06, 1, 1, 1],
+                    [0, -0.04, 1, 1, 1],
+                    [0, -0.02, 1, 1, 1],
+                    [0, 0, 1, 1, 1],
+                    [0, 0.06, 1.05, 0.9, 1],
+                    ]
+      if self.panelConfig.dangerBounceReduced:
+        animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1, animation[4]], animations)
+      baseImage = Image.open(self.panelConfig.folder + "danger.png", mode = 'r')
+      baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
+
+      self.buildAnimationWithShapeTransforms(animations, 0, baseImage)
+
   def buildFlashAnimation(self):
       self.startAnimation()
       panelImage = self.standardPanelImage()
@@ -427,7 +455,7 @@ class Panels:
     self.landingAnimationCount = 7
     self.popAnimationCount = 6
     self.maxAnimationFrames = 10
-    self.animationCount = 10
+    self.animationCount = 11
     self.useDangerBounce = True
     self.dangerBounceReduced = True
     self.previewImage = None
