@@ -1,8 +1,12 @@
-#   Given an image "garbage.png" that is three thickness high, splits
+#   Given an image "garbage@2x.png" that is three thickness high, splits
 #   it into individual pieces
 #   A placeholder face2 and double face is made even though it won't be right
+#   You should remove the background from those images so it doesn't overlap whatever pattern you have in the fill
 #
 #   The ideal generation image is 576 x 288 for 2x resolution.
+#
+#   Install python and Pillow first
+#   https://pillow.readthedocs.io/en/latest/installation/basic-installation.html
 
 from PIL import Image
 img = Image.open("garbage@2x.png")
