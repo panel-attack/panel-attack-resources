@@ -150,17 +150,20 @@ class Sheet:
     self.buildGarbagePopHoveringAnimation()
     self.buildFallingAnimation()
     self.buildDimmedAnimation()
-    self.buildDeadAnimation()
+    if self.panelConfig.useDeadSplit:
+      self.buildDeadSplitAnimation()
+    else:
+      self.buildDeadAnimation()
     self.buildLandingAnimation()
     if self.panelConfig.useDangerBounce:
-      self.buildBounceDangerAnimation()
+      self.buildBounceDangerAnimation(False)
     else:
       self.buildPulseDangerAnimation()
       # self.buildShineDangerAnimation()
     self.buildFlashAnimation()
     self.buildFaceAnimation()
     self.buildPopAnimation()
-    self.buildDangerStopAnimation()
+    self.buildBounceDangerAnimation(True)
 
   def standardPanelImage(self):
     panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
@@ -175,7 +178,6 @@ class Sheet:
 
   def buildGarbagePopHoveringAnimation(self):
     self.startAnimation()
-    panelImage = self.standardPanelImage()
     panelImage = self.backgroundImage.copy()
     panelImage = adjustExtremes(panelImage, 0, 150)
     panelImage = Image.alpha_composite(panelImage, adjustExtremes(self.borderImage, 0, 210))
@@ -282,6 +284,14 @@ class Sheet:
     self.endAnimation()
 
   def buildDeadAnimation(self):
+    multiplier = 1.2
+    animations = []
+    offset = -0.04
+    animations.append([offset, offset, multiplier, multiplier, 1])
+    overlayImage = Image.new('RGBA', self.panelSize, (255, 255, 255, 0))
+    self.buildAnimationWithShapeTransforms(animations, 0, None, self.shapeImage, overlayImage)
+
+  def buildDeadSplitAnimation(self):
     # xOffset, yOffset, xScale, yScale, alpha
     animations = [[-0.05, 0, 1.1, 1.1, 1]]
     self.buildAnimationWithShapeTransforms(animations, 1)
@@ -330,7 +340,7 @@ class Sheet:
       #   panelImage = self.backgroundImage.copy()
 
       #   shineOffsetImage = Image.new('RGBA', self.panelSize, (255, 255, 255, 0))
-      #   shineImage = Image.open(self.panelConfig.folder + "shine.png", mode = 'r')
+      #   shineImage = Image.open(self.panelConfig.rawImagefolder + "shine.png", mode = 'r')
       #   shineOffsetImage.alpha_composite(shineImage, (xOffset, yOffset))
         
       #   panelImage = blendImages(panelImage, shineOffsetImage, .75, blend_modes.overlay)
@@ -357,7 +367,7 @@ class Sheet:
         self.addFrame(panelImage)
       self.endAnimation()
 
-  def buildBounceDangerAnimation(self):
+  def buildBounceDangerAnimation(self, isPanic):
       # xOffset, yOffset, xScale, yScale, alpha
       animations = [
                     [0, 0.09, 1.1, 0.8, 1],
@@ -373,31 +383,18 @@ class Sheet:
                     ]
       if self.panelConfig.dangerBounceReduced:
         animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1, animation[4]], animations)
-      baseImage = Image.open(self.panelConfig.folder + "panic.png", mode = 'r')
-      baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
+
+      if isPanic:
+        baseImage = Image.open(self.panelConfig.rawImagefolder + "panic.png", mode = 'r')
+        baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
+      else:
+        baseImage = Image.open(self.panelConfig.rawImagefolder + "danger.png", mode = 'r')
+        baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
+      
+      baseImage = Image.alpha_composite(self.backgroundImage, baseImage)
+
       self.buildAnimationWithShapeTransforms(animations, 0, baseImage)
   
-  def buildDangerStopAnimation(self):
-      # xOffset, yOffset, xScale, yScale, alpha
-      animations = [
-                    [0, 0.09, 1.1, 0.8, 1],
-                    [0, 0.06, 1.05, 0.9, 1],
-                    [0, 0, 1, 1, 1],
-                    [0, -0.02, 1, 1, 1],
-                    [0, -0.04, 1, 1, 1],
-                    [0, -0.06, 1, 1, 1],
-                    [0, -0.04, 1, 1, 1],
-                    [0, -0.02, 1, 1, 1],
-                    [0, 0, 1, 1, 1],
-                    [0, 0.06, 1.05, 0.9, 1],
-                    ]
-      if self.panelConfig.dangerBounceReduced:
-        animations = map(lambda animation: [animation[0]/2, animation[1]/2, ((animation[2]-1)/2)+1, ((animation[3]-1)/2)+1, animation[4]], animations)
-      baseImage = Image.open(self.panelConfig.folder + "danger.png", mode = 'r')
-      baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
-
-      self.buildAnimationWithShapeTransforms(animations, 0, baseImage)
-
   def buildFlashAnimation(self):
       self.startAnimation()
       panelImage = self.standardPanelImage()
@@ -410,18 +407,13 @@ class Sheet:
       self.addFrame(panelImage)
       self.endAnimation()
 
-  def faceImage(self):
-      maskedPanelImage = self.shapeImage.copy()
-      # for yPixel in range(self.panelSize[1]):
-      #   for xPixel in range(self.panelSize[0]):
-      #       r, g, b, a = maskedPanelImage.getpixel((xPixel, yPixel))
-      #       maskedPanelImage.putpixel((xPixel, yPixel), (r, g, b, int(a * 0.6)))  # Reduce alpha by 50%
-      maskedPanelImage = adjustExtremes(maskedPanelImage, 0, 150)
-      return maskedPanelImage
+  def darkenedShapeImage(self):
+      adjustedImage = adjustExtremes(self.shapeImage, 0, 150)
+      return adjustedImage
 
   def buildFaceAnimation(self):
       self.startAnimation()
-      maskedPanelImage = self.faceImage()
+      maskedPanelImage = self.darkenedShapeImage()
       panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
       panelImage = Image.alpha_composite(panelImage, maskedPanelImage)
       self.addFrame(panelImage)
@@ -437,42 +429,43 @@ class Sheet:
         multiplier -= multiplierDecrement
       baseImage = Image.new('RGBA', self.panelSize, (255, 255, 255, 0))
       overlayImage = Image.new('RGBA', self.panelSize, (255, 255, 255, 0))
-      self.buildAnimationWithShapeTransforms(animations, 1, baseImage, self.faceImage(), overlayImage)
+      self.buildAnimationWithShapeTransforms(animations, 1, baseImage, self.darkenedShapeImage(), overlayImage)
 
   def buildPanelBaseImages(self):
-      self.backgroundImage = Image.open(self.panelConfig.folder + self.index + "background.png", mode = 'r')
+      self.backgroundImage = Image.open(self.panelConfig.rawImagefolder + self.index + "background.png", mode = 'r')
       self.backgroundImage = shiftImageHue(self.backgroundImage, self.hue, self.saturation, self.lightnessFactor)
-      self.borderImage = Image.open(self.panelConfig.folder + self.index + "border.png", mode = 'r')
+      self.borderImage = Image.open(self.panelConfig.rawImagefolder + self.index + "border.png", mode = 'r')
       self.borderImage = shiftImageHue(self.borderImage, self.hue, self.saturation, self.lightnessFactor)
-      self.shapeImage = Image.open(self.panelConfig.folder + self.index + "shape.png", mode = 'r')
+      self.shapeImage = Image.open(self.panelConfig.rawImagefolder + self.index + "shape.png", mode = 'r')
       self.shapeImage = shiftImageHue(self.shapeImage, self.hue, self.saturation, self.lightnessFactor)
 
 class Panels:
-  def __init__(self, baseFolder, panelSettings):
-    self.baseFolder = baseFolder
-    self.folder = self.baseFolder + "/RawImages/"
+  def __init__(self, baseFolder, saveDirectory, hslSettings, panelSettings):
+    self.baseFolder = os.path.normpath(baseFolder)
+    self.rawImagefolder = self.baseFolder + "/RawImages/"
+    folderName = baseFolder.split(os.sep)[-1]
+    self.outputFolder = saveDirectory + folderName + "/"
+    os.makedirs(os.path.dirname(self.outputFolder), exist_ok=True)
     self.configFileName = "config.json"
     self.landingAnimationCount = 7
     self.popAnimationCount = 6
     self.maxAnimationFrames = 10
     self.animationCount = 11
-    self.useDangerBounce = True
-    self.dangerBounceReduced = True
+    self.useDeadSplit = panelSettings["useDeadSplit"]
+    self.useDangerBounce = panelSettings["useDangerBounce"]
+    self.dangerBounceReduced = panelSettings["dangerBounceReduced"]
     self.previewImage = None
+    self.hslSettings = hslSettings
     self.panelSettings = panelSettings
 
-  def createSheets(self, saveDirectory):
-    baseFolder = os.path.normpath(self.baseFolder)
-    folderName = baseFolder.split(os.sep)[-1]
-    outputFolder = saveDirectory + folderName + "/"
-    os.makedirs(os.path.dirname(outputFolder), exist_ok=True)
+  def createSheets(self):
 
     panelColorCount = 8
     for i in range(1, panelColorCount+1):
       index = str(i)
-      hue = self.panelSettings[i-1][0]
-      saturation = self.panelSettings[i-1][1]
-      lightnessFactor = self.panelSettings[i-1][2]
+      hue = self.hslSettings[i-1][0]
+      saturation = self.hslSettings[i-1][1]
+      lightnessFactor = self.hslSettings[i-1][2]
       sheet = Sheet(self, index, hue, saturation, lightnessFactor)
       sheet.buildSheet(index)
       if i == 1:
@@ -481,20 +474,31 @@ class Panels:
       if self.previewImage == None: 
         self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * (panelColorCount), sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 255, 255, 0))
       self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))
-      sheet.sheetImage.save(outputFolder + "panel-" + index + "@2x.png")
+      sheet.sheetImage.save(self.outputFolder + "panel-" + index + "@2x.png")
 
-    fileSuffix = "@2x.png"
-    panel0Name = "panel00"
-    shutil.copyfile(self.folder + panel0Name + ".png", outputFolder + panel0Name + fileSuffix)
-    shutil.copyfile(self.baseFolder + "/" + self.configFileName, outputFolder + self.configFileName)
+    self.copyRemainingFiles()
 
     self.previewImage.show()
 
-baseFolder = sys.argv[1]
+  def copyRemainingFiles(self):
+     
+    self.transferFile("panel00")
+    self.transferFile("metalend0")
+    self.transferFile("metalend1")
+    self.transferFile("metalmid")
+
+    # Copy the config file
+    shutil.copyfile(self.baseFolder + "/" + self.configFileName, self.outputFolder + self.configFileName)
+
+  def transferFile(self, filename):
+    fileSuffix = "@2x.png"
+    shutil.copyfile(self.rawImagefolder + filename + ".png", self.outputFolder + filename + fileSuffix)
+
+panelFolderName = sys.argv[1]
 saveFolder = sys.argv[2]
-panelSettings = []
+hslSettings = []
 # Classic
-panelSettings += [[[359 / 360.0, 1.00, 0.85],
+hslSettings += [[[359 / 360.0, 1.00, 0.85],
                   [120 / 360.0, 1.00, 0.85],
                   [180 / 360.0, 1.00, 0.86],
                   [60  / 360.0, 1.00, 0.86],
@@ -504,7 +508,7 @@ panelSettings += [[[359 / 360.0, 1.00, 0.85],
                   [0   / 360.0, 0.00, 1.38],
                  ]]
 # JamBox
-panelSettings += [[[0   / 360.0, 1, 1],
+hslSettings += [[[0   / 360.0, 1, 1],
                   [126 / 360.0, 1, 1.1],
                   [194 / 360.0, 1, 1],
                   [67  / 360.0, 1, 0.97],
@@ -514,7 +518,7 @@ panelSettings += [[[0   / 360.0, 1, 1],
                   [0   / 360.0, 0.00, 1.38],
                   ]]
 # PACCI Classic
-panelSettings += [[[6   / 360.0, 1.00, 1.08],
+hslSettings += [[[6   / 360.0, 1.00, 1.08],
                    [75  / 360.0, 0.70, 0.90],
                    [206 / 360.0, 0.90, 1.08],
                    [48  / 360.0, 0.79, 1.19],
@@ -523,5 +527,35 @@ panelSettings += [[[6   / 360.0, 1.00, 1.08],
                    [359 / 360.0, 0.34, 0.97],
                    [0   / 360.0, 0.00, 1.38],
                   ]]
-panelConfig = Panels(baseFolder, panelSettings[1])
-panelConfig.createSheets(saveFolder)
+
+# JamBox Classic
+hslSettings += [[[359 / 360.0, 1.00, 0.85],
+                  [120 / 360.0, 1.00, 0.85],
+                  [180 / 360.0, 1.00, 0.86],
+                  [60  / 360.0, 1.00, 0.86],
+                  [326 / 360.0, 1, 1.07],
+                  [237 / 360.0, 1, 0.90],
+                  [19  / 360.0, 1.00, 1.153],
+                  [0   / 360.0, 0.00, 1.38],
+                 ]]
+
+panelSettings = {
+  "useDeadSplit": True,
+  "dangerBounceReduced": True,
+  "useDangerBounce": True
+}
+
+# Crisp PA
+currentHSLSettings = hslSettings[1]
+# panelSettings["dangerBounceReduced"] = False
+# panelSettings["useDangerBounce"] = False
+
+# Simple
+currentHSLSettings = hslSettings[0]
+# currentHSLSettings = hslSettings[3]
+panelSettings["useDeadSplit"] = False
+panelSettings["dangerBounceReduced"] = False
+# panelSettings["useDangerBounce"] = False
+
+panelConfig = Panels(panelFolderName, saveFolder, currentHSLSettings, panelSettings)
+panelConfig.createSheets()
