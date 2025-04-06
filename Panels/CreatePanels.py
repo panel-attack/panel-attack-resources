@@ -1,5 +1,8 @@
-#pip3 install pillow
-#pip3 install blend_modes
+# This script takes a bunch of raw image files for panels and compiles them into animated sprite sheets.
+# You should run this in the directory above the panel folders that have the raw data.
+# You should executed with the only argument the path to a folder you want to save the output to.
+# Make sure to change the settings below to your liking. Documentation is inline.
+
 import os
 import sys
 import shutil
@@ -7,6 +10,76 @@ import colorsys
 from PIL import Image, ImageEnhance
 import numpy as numpy
 import blend_modes as blend_modes
+
+saveFolder = sys.argv[1]
+hslSettings = [] # each row is a Hue, Saturation percentage scale, and Lightness percentage scale for each color
+# Classic
+hslSettings += [[[359 / 360.0, 1.00, 0.85],
+                  [120 / 360.0, 1.00, 0.85],
+                  [180 / 360.0, 1.00, 0.86],
+                  [60  / 360.0, 1.00, 0.86],
+                  [300 / 360.0, 1.00, 0.93],
+                  [225 / 360.0, 1.00, 1.071],
+                  [19  / 360.0, 1.00, 1.153],
+                  [0   / 360.0, 0.00, 1.38],
+                 ]]
+# JamBox
+hslSettings += [[[0   / 360.0, 1, 1],
+                  [126 / 360.0, 1, 1.1],
+                  [194 / 360.0, 1, 1],
+                  [67  / 360.0, 1, 0.97],
+                  [326 / 360.0, 1, 1.07],
+                  [237 / 360.0, 1, 0.90],
+                  [26  / 360.0, 1, 1],
+                  [0   / 360.0, 0.00, 1.38],
+                  ]]
+# PACCI Classic
+hslSettings += [[[6   / 360.0, 1.00, 1.08],
+                   [75  / 360.0, 0.70, 0.90],
+                   [206 / 360.0, 0.90, 1.08],
+                   [48  / 360.0, 0.79, 1.19],
+                   [304 / 360.0, 0.60, 1.18],
+                   [35  / 360.0, 0.91, 1.04],
+                   [359 / 360.0, 0.34, 0.97],
+                   [0   / 360.0, 0.00, 1.38],
+                  ]]
+
+# JamBox Classic
+hslSettings += [[[359 / 360.0, 1.00, 0.85],
+                  [120 / 360.0, 1.00, 0.85],
+                  [180 / 360.0, 1.00, 0.86],
+                  [60  / 360.0, 1.00, 0.86],
+                  [326 / 360.0, 1, 1.07],
+                  [237 / 360.0, 1, 0.90],
+                  [19  / 360.0, 1.00, 1.153],
+                  [0   / 360.0, 0.00, 1.38],
+                 ]]
+
+panelSettings = {
+  "useDeadSplit": True, # If true the dead animation will split in the middle
+  "dangerBounceReduced": True, # If true the danger bounch animation will be subtler
+  "useDangerBounce": True # If false the danger bounch won't be used and instead an experimental light pulse animation is used
+}
+
+# panelFolderName - the name of the folder you are generating from
+
+# Panel Attack Sharp
+# panelFolderName = "Panel Attack Sharp"
+# currentHSLSettings = hslSettings[1]
+# panelSettings["useDeadSplit"] = True
+# panelSettings["dangerBounceReduced"] = True
+
+# Panel Attack Simple
+panelFolderName = "Panel Attack Simple"
+currentHSLSettings = hslSettings[0]
+panelSettings["useDeadSplit"] = False
+panelSettings["dangerBounceReduced"] = False
+
+# Panel Attack Simple JamBox Style
+# panelFolderName = "Panel Attack Simple"
+# currentHSLSettings = hslSettings[3]
+# panelSettings["useDeadSplit"] = False
+# panelSettings["dangerBounceReduced"] = True
 
 def rgb_to_hsl(rgb):
     """Convert RGB to HSL.
@@ -164,6 +237,7 @@ class Sheet:
     self.buildFaceAnimation()
     self.buildPopAnimation()
     self.buildBounceDangerAnimation(True)
+    self.buildFlashGarbage()
 
   def standardPanelImage(self):
     panelImage = Image.alpha_composite(self.backgroundImage, self.borderImage)
@@ -395,6 +469,17 @@ class Sheet:
 
       self.buildAnimationWithShapeTransforms(animations, 0, baseImage)
   
+  def buildFlashGarbage(self):
+      panelImage = Image.new('RGBA', self.panelSize, (255, 255, 255, 0))
+      leftImage = Image.open(self.panelConfig.rawImagefolder + "metalend0.png", mode = 'r')
+      rightImage = Image.open(self.panelConfig.rawImagefolder + "metalend1.png", mode = 'r')
+      width = int(self.panelSize[0]/2)
+      panelImage.alpha_composite(leftImage, (0, 0))
+      panelImage.alpha_composite(rightImage, (width, 0))
+      # panelImage = adjustExtremes(panelImage, 60, 255)
+      panelImage = adjust_levels(panelImage, 0, 120)
+      panelImage.save(self.panelConfig.outputFolder + "garbageflash@2x.png")
+
   def buildFlashAnimation(self):
       self.startAnimation()
       panelImage = self.standardPanelImage()
@@ -472,9 +557,13 @@ class Panels:
         sheet.sheetImage.show()
         # sys.exit()
       if self.previewImage == None: 
-        self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * (panelColorCount), sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 255, 255, 0))
-      self.previewImage.paste(sheet.sheetImage, ((i-1) * sheet.panelSize[0], 0))
+        self.previewImage = Image.new('RGBA', (sheet.panelSize[0] * (panelColorCount+1), sheet.panelSize[1] * sheet.panelConfig.animationCount), (255, 255, 255, 0))
+      croppedSheetImage = sheet.sheetImage.crop((0, 0, sheet.panelSize[0], sheet.panelSize[1] * sheet.panelConfig.animationCount))
+      self.previewImage.paste(croppedSheetImage, ((i-1) * sheet.panelSize[0], 0))
       sheet.sheetImage.save(self.outputFolder + "panel-" + index + "@2x.png")
+
+    panel00Image = Image.open(self.rawImagefolder + "panel00.png", mode = 'r')
+    self.previewImage.paste(panel00Image, (panelColorCount * sheet.panelSize[0], 0))
 
     self.copyRemainingFiles()
 
@@ -493,69 +582,6 @@ class Panels:
   def transferFile(self, filename):
     fileSuffix = "@2x.png"
     shutil.copyfile(self.rawImagefolder + filename + ".png", self.outputFolder + filename + fileSuffix)
-
-panelFolderName = sys.argv[1]
-saveFolder = sys.argv[2]
-hslSettings = []
-# Classic
-hslSettings += [[[359 / 360.0, 1.00, 0.85],
-                  [120 / 360.0, 1.00, 0.85],
-                  [180 / 360.0, 1.00, 0.86],
-                  [60  / 360.0, 1.00, 0.86],
-                  [300 / 360.0, 1.00, 0.93],
-                  [225 / 360.0, 1.00, 1.071],
-                  [19  / 360.0, 1.00, 1.153],
-                  [0   / 360.0, 0.00, 1.38],
-                 ]]
-# JamBox
-hslSettings += [[[0   / 360.0, 1, 1],
-                  [126 / 360.0, 1, 1.1],
-                  [194 / 360.0, 1, 1],
-                  [67  / 360.0, 1, 0.97],
-                  [326 / 360.0, 1, 1.07],
-                  [237 / 360.0, 1, 0.90],
-                  [26  / 360.0, 1, 1],
-                  [0   / 360.0, 0.00, 1.38],
-                  ]]
-# PACCI Classic
-hslSettings += [[[6   / 360.0, 1.00, 1.08],
-                   [75  / 360.0, 0.70, 0.90],
-                   [206 / 360.0, 0.90, 1.08],
-                   [48  / 360.0, 0.79, 1.19],
-                   [304 / 360.0, 0.60, 1.18],
-                   [35  / 360.0, 0.91, 1.04],
-                   [359 / 360.0, 0.34, 0.97],
-                   [0   / 360.0, 0.00, 1.38],
-                  ]]
-
-# JamBox Classic
-hslSettings += [[[359 / 360.0, 1.00, 0.85],
-                  [120 / 360.0, 1.00, 0.85],
-                  [180 / 360.0, 1.00, 0.86],
-                  [60  / 360.0, 1.00, 0.86],
-                  [326 / 360.0, 1, 1.07],
-                  [237 / 360.0, 1, 0.90],
-                  [19  / 360.0, 1.00, 1.153],
-                  [0   / 360.0, 0.00, 1.38],
-                 ]]
-
-panelSettings = {
-  "useDeadSplit": True,
-  "dangerBounceReduced": True,
-  "useDangerBounce": True
-}
-
-# Crisp PA
-currentHSLSettings = hslSettings[1]
-# panelSettings["dangerBounceReduced"] = False
-# panelSettings["useDangerBounce"] = False
-
-# Simple
-currentHSLSettings = hslSettings[0]
-# currentHSLSettings = hslSettings[3]
-panelSettings["useDeadSplit"] = False
-panelSettings["dangerBounceReduced"] = False
-# panelSettings["useDangerBounce"] = False
 
 panelConfig = Panels(panelFolderName, saveFolder, currentHSLSettings, panelSettings)
 panelConfig.createSheets()
