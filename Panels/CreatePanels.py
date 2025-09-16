@@ -70,16 +70,16 @@ panelSettings = {
 # panelSettings["dangerBounceReduced"] = True
 
 # Panel Attack Simple
-panelFolderName = "Panel Attack Simple"
-currentHSLSettings = hslSettings[0]
-panelSettings["useDeadSplit"] = False
-panelSettings["dangerBounceReduced"] = False
+# panelFolderName = "Panel Attack Simple"
+# currentHSLSettings = hslSettings[0]
+# panelSettings["useDeadSplit"] = False
+# panelSettings["dangerBounceReduced"] = False
 
 # Panel Attack Simple JamBox Style
-# panelFolderName = "Panel Attack Simple"
-# currentHSLSettings = hslSettings[3]
-# panelSettings["useDeadSplit"] = False
-# panelSettings["dangerBounceReduced"] = True
+panelFolderName = "Panel Attack Simple"
+currentHSLSettings = hslSettings[1]
+panelSettings["useDeadSplit"] = False
+panelSettings["dangerBounceReduced"] = True
 
 def rgb_to_hsl(rgb):
     """Convert RGB to HSL.
