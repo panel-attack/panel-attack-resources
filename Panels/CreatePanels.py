@@ -460,7 +460,7 @@ class Sheet:
 
       if isPanic:
         baseImage = Image.open(self.panelConfig.rawImagefolder + "panic.png", mode = 'r')
-        baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
+        baseImage = shiftImageHue(baseImage, self.hue, self.saturation / 4, self.lightnessFactor / 4)
       else:
         baseImage = Image.open(self.panelConfig.rawImagefolder + "danger.png", mode = 'r')
         baseImage = shiftImageHue(baseImage, self.hue, self.saturation, self.lightnessFactor)
