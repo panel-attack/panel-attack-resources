@@ -11,6 +11,8 @@ SHEETS = os.path.join(BUILD, 'sheets')
 # part SVGs cut out of the sheets, at the path their PNG has in the game's scenes folder
 SVG_SCENES = os.path.join(BUILD, 'parts')
 INDEX = os.path.join(BUILD, 'index.json')
+# every part's rendered PNG, at its path below the theme's scenes/; layout and stage copy the ones they draw
+RENDERED = os.path.join(BUILD, 'scenes')
 # the folder holding the one file Pixelmator Pro opens, each part SVG copied over it in turn
 STAGING = os.path.join(BUILD, 'pixelmator')
 

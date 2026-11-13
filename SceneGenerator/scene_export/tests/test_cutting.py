@@ -8,23 +8,23 @@ from scene_export import cutting, preview, templates as T
 
 # ---------------------------------------------------------------- placement maths
 
-def test_an_image_node_sits_at_its_parts_box_in_scene_units():
+def test_an_image_node_sits_at_its_parts_box_on_the_canvas():
     part = cutting.Part('furniture/parts/left-urn/body', '<svg/>', (300, 410, 220, 340))
     assert cutting.image_node('left urn body', part) == {'id': 'left urn body', 'filePath': part.path,
-                                                         'position': {'x': 150, 'y': 205}}
+                                                         'position': {'x': 250, 'y': 275}}
 
 
 def test_an_image_ref_places_its_template_where_the_part_sits():
     part = cutting.Part('scenery/parts/clouds/wisps', '<svg/>', (61, 40, 300, 90))
     assert cutting.image_ref('wisps', 'scenery/clouds.json', 'cloud-wisps', part) == {
-        'id': 'wisps', 'ref': 'scenery/clouds.json#cloud-wisps', 'overrides': {'position': {'x': 30.5, 'y': 20}}}
+        'id': 'wisps', 'ref': 'scenery/clouds.json#cloud-wisps', 'overrides': {'position': {'x': 51, 'y': -33}}}
 
 
 def test_a_marker_ref_places_its_template_where_the_generator_drew_it():
     g = ET.Element('g', {'id': 'cypress 1', 'data-template': 'cypress', 'data-at': '101,64.5', 'data-scale': '-1,0.75'})
     assert cutting.marker_ref(g, 'plants/trees.json') == {
         'id': 'cypress 1', 'ref': 'plants/trees.json#cypress',
-        'overrides': {'position': {'x': 50.5, 'y': 32.25}, 'xScale': -1, 'yScale': 0.75}}
+        'overrides': {'position': {'x': 84, 'y': -13}, 'xScale': -1, 'yScale': 0.75}}
 
 
 def stem_overrides(pl):

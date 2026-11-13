@@ -18,6 +18,12 @@ def walk(nodes):
 
 @pytest.fixture(scope='module')
 def built():
+    """The terrace as the generators draw it; the scene-editor edits are tested in test_esme_placements."""
+    return EsmeTerrace.generated()
+
+
+@pytest.fixture(scope='module')
+def edited():
     return EsmeTerrace.build()
 
 
@@ -32,14 +38,14 @@ def group(built, gid):
 GROUND = ['sky', 'clouds', 'background', 'lake shimmer', 'far trees', 'town', 'near trees', 'rail end shrub', 'floor']
 
 
-def test_objects_are_in_the_paintings_layer_order(built):
-    assert [n['id'] for n in built['drawables']] == GROUND + [
+def test_objects_are_in_the_paintings_layer_order(edited):
+    assert [n['id'] for n in edited['drawables']] == [g for g in GROUND if g != 'rail end shrub'] + [
         'rail', 'crystal planter', 'left urn', 'right urn', 'table set', 'corner bush']
 
 
-def test_every_object_draws_its_shadow_then_its_template(built):
-    for obj in built['drawables'][len(GROUND) + 1:]:
-        assert [c['id'] for c in obj['children']] == [obj['id'] + ' shadow', obj['id'] + ' object']
+def test_every_object_draws_its_shadow_then_its_template(edited):
+    for obj in edited['drawables'][len(GROUND):]:
+        assert [c['id'] for c in obj['children']][-2:] == [obj['id'] + ' shadow', obj['id'] + ' object']
 
 
 # ---------------------------------------------------------------- the sky and the landscape
@@ -48,6 +54,14 @@ def test_the_clouds_are_a_group_of_one_ref_per_cloud(built):
     ids = [c['id'] for c in top(built, 'clouds')['children']]
     assert len(ids) == len(set(ids))
     assert all(c['ref'].startswith('scenery/clouds.json#') for c in top(built, 'clouds')['children'])
+
+
+def test_the_terrace_sky_is_a_one_png_px_strip_stretched_across_the_canvas():
+    from scenery import sky, sky_template
+    strip = sky.parts()[0]
+    assert (strip.box, strip.strip) == ((0, 0, 2, 1024), True)
+    template = next(t for t in sky_template.build()['drawables'] if t['id'] == sky_template.TEMPLATE)
+    assert (template['size'], template['pivot']) == ({'width': 1280}, 'topLeft')
 
 
 def test_the_sky_has_no_wisps(built):
@@ -60,7 +74,7 @@ def test_the_scene_clouds_voted_down_are_gone(built):
 
 
 def test_a_second_set_of_clouds_as_big_as_the_first_waits_off_the_left_edge_to_drift_in(built):
-    widths = {cid: part.box[2] / 2 for cid, part in clouds.cut()}
+    widths = {cid: cutting.length(part.box[2]) for cid, part in clouds.cut()}
     xs = [(c['overrides']['position']['x'], widths[c['id']]) for c in top(built, 'clouds')['children']]
     in_view = [x for x, w in xs if x + w > 0 and x < wind.SCENE_SIZE[0]]
     waiting = [x for x, w in xs if x + w <= 0]
@@ -75,7 +89,7 @@ def test_a_cloud_wraps_round_while_its_whole_image_is_out_of_sight(built):
     widths = {cid: part.box[2] for cid, part in clouds.cut()}
     for cloud in top(built, 'clouds')['children']:
         in_left = cloud['overrides']['animationTracks'][0]['steps'][1]['animateProperties']['x']
-        assert in_left <= -widths[cloud['id']] / 2 - wind.OUT_OF_SIGHT, cloud['id']
+        assert in_left <= -cutting.length(widths[cloud['id']]) - wind.OUT_OF_SIGHT, cloud['id']
 
 
 def test_a_round_4_cloud_is_its_voted_layout_placed_in_the_sky():
@@ -87,8 +101,8 @@ def test_a_round_4_cloud_is_its_voted_layout_placed_in_the_sky():
 
 def boxes(built):
     widths = {cid: part.box for cid, part in clouds.cut()}
-    return [(c['id'], c['overrides']['position']['x'], c['overrides']['position']['y'], widths[c['id']][2] / 2,
-             widths[c['id']][3] / 2) for c in top(built, 'clouds')['children']]
+    return [(c['id'], c['overrides']['position']['x'], c['overrides']['position']['y'], cutting.length(widths[c['id']][2]),
+             cutting.length(widths[c['id']][3])) for c in top(built, 'clouds')['children']]
 
 
 def test_clouds_side_by_side_at_one_depth_stay_apart_all_the_way_round_their_lap(built):
@@ -139,7 +153,7 @@ def x_at(cloud, t):
 
 
 def test_about_as_many_clouds_stay_in_view_all_the_time(built):
-    widths = {cid: part.box[2] / 2 for cid, part in clouds.cut()}
+    widths = {cid: cutting.length(part.box[2]) for cid, part in clouds.cut()}
     drifting = [c for c in top(built, 'clouds')['children']]
     for t in range(0, 3 * 3600, 10):
         seen = sum(1 for c in drifting if x_at(c, t) + widths[c['id']] > 0 and x_at(c, t) < wind.SCENE_SIZE[0])
@@ -366,7 +380,7 @@ def test_a_tree_stands_where_background_svg_draws_it(built):
         x, y = (float(v) for v in g.get('data-at').split(','))
         sx, sy = (float(v) for v in g.get('data-scale').split(','))
         o = n['overrides']
-        assert (o['position']['x'], o['position']['y']) == pytest.approx((x / 2, y / 2), abs=1e-3)
+        assert cutting.sheet_point(o['position']) == pytest.approx((x, y), abs=0.6)
         assert (o['xScale'], o['yScale']) == pytest.approx((sx, sy), abs=1e-5)
     assert placed == {}
 
@@ -399,7 +413,7 @@ def tall(n):
 
 
 def foot(n):
-    return n['overrides']['position']['x'] * 2, n['overrides']['position']['y'] * 2
+    return cutting.sheet_point(n['overrides']['position'])
 
 
 def far(built, name):
@@ -539,7 +553,7 @@ def test_a_bank_tree_stands_on_land_not_in_the_lake(built, side, hill, bank):
     for n in far(built, side):
         x, y = foot(n)
         edge = lines[bank] if lines[bank][0][0] <= x <= lines[bank][-1][0] else lines[hill]
-        assert y <= landscape.curve_y(edge, x) + 0.1, n['id']   # positions are rounded to 0.1 canvas px
+        assert y <= landscape.curve_y(edge, x) + 0.4, n['id']   # positions snap to half a unit, 0.6 sheet px
 
 
 @pytest.mark.parametrize('side, outer_is_left', [('left bank trees', True), ('right bank trees', False)])
@@ -634,7 +648,7 @@ def test_low_shrubs_line_a_banks_shore(built, side, hill, bank):
     assert len(shrubs) >= 8
     for n in shrubs:
         x, y = foot(n)
-        assert 0 <= bank_span(x, hill, bank)[1] - y <= 6, n['id']
+        assert -0.4 <= bank_span(x, hill, bank)[1] - y <= 6, n['id']     # positions snap to half a unit
 
 
 # ---------------------------------------------------------------- the lake

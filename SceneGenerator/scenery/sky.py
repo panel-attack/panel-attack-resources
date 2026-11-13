@@ -6,7 +6,7 @@
 import os
 
 from common.painting import HEIGHT, WIDTH, Svg, mix
-from scene_export import cutting
+from scene_export import cutting, svgtools
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -15,6 +15,7 @@ SKY_TOP, SKY_HORIZON = '#22b0fb', '#7ae6fd'
 
 
 SKY_GRADIENT_END = 383           # y where the sky reaches its pale colour
+STRIP = (0, 0, 2, HEIGHT)        # the terrace sky changes only downward: its PNG is one px wide, stretched across
 
 def colour_at(y):
     return mix(SKY_TOP, SKY_HORIZON, min(1.0, max(0.0, y / SKY_GRADIENT_END)))
@@ -51,7 +52,8 @@ def main():
 
 def parts():
     root, grads = cutting.load('scenery/sky.svg')
-    return [cutting.static_part('scenery/parts/sky/sky', [cutting.find_group(root, 'Sky')], grads, 'sky'),
+    return [cutting.Part('scenery/parts/sky/sky', svgtools.part_svg('sky', [cutting.find_group(root, 'Sky')], grads,
+                                                                 STRIP), STRIP, strip=True),
             cutting.static_part('scenery/parts/sky/sky-day-valley', [cutting.find_group(root, 'Sky Day Valley')], grads,
                                 'sky-day-valley')]
 

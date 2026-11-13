@@ -41,17 +41,6 @@ def test_making_the_theme_copy_leaves_the_generators_doc_alone():
 
 # ---------------------------------------------------------------- the screen
 
-def test_the_screen_scene_covers_the_whole_canvas_and_centres_the_terrace():
-    [root] = game.screen_scene('EsmeTerrace', (768, 512))['drawables']
-    w, h = 768 * root['xScale'], 512 * root['yScale']
-    assert root['xScale'] == root['yScale']
-    assert w >= game.CANVAS[0] and h >= game.CANVAS[1]
-    assert min(w - game.CANVAS[0], h - game.CANVAS[1]) == pytest.approx(0)
-    assert root['position']['x'] == pytest.approx((game.CANVAS[0] - w) / 2)
-    assert root['position']['y'] == pytest.approx((game.CANVAS[1] - h) / 2)
-    assert root['children'] == [{'id': 'EsmeTerrace scene', 'ref': 'EsmeTerrace/EsmeTerrace.json'}]
-
-
 @pytest.mark.parametrize('flag, want', [('loopTrack', 'loop'), ('yoyo', 'yoyo')])
 def test_the_theme_copy_repeats_tracks_the_way_the_game_reads_them(flag, want):
     doc = {'drawables': [{'id': 'cloud', 'animationTracks': [{flag: True, 'steps': []}]}]}

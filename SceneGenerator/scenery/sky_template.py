@@ -12,9 +12,10 @@ DAY_VALLEY_TEMPLATE = 'sky-day-valley'
 
 def build():
     terrace, day_valley = sky.parts()
-    return {'drawables': [cutting.image_template(TEMPLATE, terrace),
+    return {'drawables': [dict(cutting.image_template(TEMPLATE, terrace), size={'width': cutting.GAME_CANVAS[0]},
+                               pivot='topLeft'),
                           cutting.image_template(DAY_VALLEY_TEMPLATE, day_valley)]}
 
 
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)

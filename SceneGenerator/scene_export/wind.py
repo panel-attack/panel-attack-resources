@@ -11,12 +11,14 @@ import copy
 import math
 import random
 
-SCENE_SIZE = (768, 512)
+from .cutting import GAME_CANVAS
 
-FRONT_CLOUD = (20, 7.0)             # (y, scene units a second) of a high cloud in front
-HORIZON_CLOUD = (125, 0.6)          # and of one low down near the horizon, drifting slowest
-OUT_OF_SIGHT = 4                    # scene units past the canvas edge a cloud wraps at
-CLOUD_LAP = 2 * SCENE_SIZE[0]       # scene units a cloud drifts before it comes round again, so half the clouds
+SCENE_SIZE = GAME_CANVAS
+
+FRONT_CLOUD = (-100 / 3, 35 / 3)    # (y, canvas units a second) of a high cloud in front, its top above the canvas
+HORIZON_CLOUD = (425 / 3, 1.0)      # and of one low down near the horizon, drifting slowest
+OUT_OF_SIGHT = 20 / 3               # canvas units past the canvas edge a cloud wraps at
+CLOUD_LAP = 2 * SCENE_SIZE[0]       # canvas units a cloud drifts before it comes round again, so half the clouds
                                     # wait off the left edge as a second set while the rest are in view
 JUMP_SECONDS = 0.001                # flux never finishes a tween of no time
 
@@ -33,7 +35,7 @@ SWAY = {'flower': 0.07, 'daisy': 0.07, 'bud': 0.07, 'tulip': 0.07, 'rose': 0.06,
         'branch': 0.045, 'rosette': 0.025}           # radians a plant leans in the strongest gust, by its template's kind
 TWINKLE_SECONDS = 1.6              # for a set of glints to fade from bright to dim
 TWINKLE_DIM = 0.15                 # a set of glints' alpha at its dimmest
-RIPPLE = (1.5, 2.3)                # (scene units, seconds) a set of glints slides sideways and back
+RIPPLE = (2.5, 2.3)                # (canvas units, seconds) a set of glints slides sideways and back
 PLANT_REFS = ('branches.json#', 'leaves.json#', 'flowers.json#', 'roses.json#', 'stems.json#')
 
 
@@ -50,7 +52,7 @@ def cloud_speed(y):
 
 def drift(placed, width, speed=None):
     """Off the right edge, back a lap to the left out of sight, and on to its own place, at a steady speed, by default
-    the one for its height. placed holds the cloud's position, width is its image's in scene units."""
+    the one for its height. placed holds the cloud's position, width is its image's in canvas units."""
     x, speed = placed['position']['x'], speed or cloud_speed(placed['position']['y'])
     off_right = SCENE_SIZE[0] + OUT_OF_SIGHT
     in_left = off_right - CLOUD_LAP
@@ -113,12 +115,13 @@ def sway_of(node):
     return SWAY[node['ref'].partition('#')[2].split('-')[0]]
 
 
-def sway(node, share=1.0):
-    """The plant following the wind about its own rotation, as late as the wind takes to reach it from the left,
-    leaning share of its kind's sway."""
+def sway(node, share=1.0, delay=None):
+    """The plant following the wind about its own rotation, as late as the wind takes to reach it from the left or
+    after delay seconds, leaning share of its kind's sway."""
     overrides = node['overrides']
     base, amount = overrides.get('rotation', 0), share * sway_of(node)
-    lag = overrides.get('position', {}).get('x', 0) / SCENE_SIZE[0] * WAVE_SECONDS + random.Random(node['id']).uniform(0, WAVE_JITTER)
+    lag = delay if delay is not None else (overrides.get('position', {}).get('x', 0) / SCENE_SIZE[0] * WAVE_SECONDS
+                                           + random.Random(node['id']).uniform(0, WAVE_JITTER))
     steps = [{'durationSeconds': seconds, 'easeType': 'sineinout', 'animateProperties': {'rotation': base + lean * amount}}
              for seconds, lean in WIND]
     steps[0]['delaySeconds'] = lag
@@ -128,7 +131,7 @@ def sway(node, share=1.0):
 
 
 def swayed(nodes):
-    """Copies of the nodes, placed in scene units, with a track on every plant among them."""
+    """Copies of the nodes, placed in canvas units, with a track on every plant among them."""
     nodes = copy.deepcopy(nodes)
     for n in walk(nodes):
         if any(r in n.get('ref', '') for r in PLANT_REFS):

@@ -3,7 +3,8 @@
 The generators only write absolute M, L, H, V, C, Q and Z commands, so a path's bounding box is the box
 of its points (control points included, which only makes it larger) and moving a path is adding to every
 coordinate. Part SVGs are written in exactly the form the generators use, which Pixelmator Pro opens:
-a root with integer width and height and a viewBox starting at 0 0, then defs, then one group."""
+a root with integer width and height and a viewBox starting at 0 0, then defs, then one group. A part drawn at its
+native size (native.py) keeps that form but scales its viewBox to its width and height, which Pixelmator Pro draws."""
 
 import math
 import re
@@ -13,7 +14,7 @@ from xml.sax.saxutils import quoteattr
 SVG_NS = 'http://www.w3.org/2000/svg'
 TOKEN = re.compile(r'[MLHVCQZmlhvcqz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?')
 ALLOWED = {     # every element and attribute the generators' SVGs use
-    'svg': {'xmlns', 'width', 'height', 'viewBox'},
+    'svg': {'xmlns', 'width', 'height', 'viewBox', 'preserveAspectRatio'},
     'defs': set(),
     'linearGradient': {'id', 'x1', 'y1', 'x2', 'y2', 'gradientUnits'},
     'stop': {'offset', 'stop-color'},
@@ -222,8 +223,9 @@ def part_svg(name, elements, gradients, box):
     return head + serialise(group) + '\n</svg>\n'
 
 
-def validate(text):
-    """Problems that could stop Pixelmator Pro opening the SVG, or [] when it has the generators' form."""
+def validate(text, strip=False, native=False):
+    """Problems that could stop Pixelmator Pro opening the SVG, or [] when it has the generators' form; a part drawn
+    at its native size (native.py) draws its viewBox at its width and height, and a strip may be one px wide."""
     problems = []
     try:
         root = ET.fromstring(text)
@@ -235,9 +237,19 @@ def validate(text):
     if not (w.isdigit() and h.isdigit()):
         return ['width and height must be whole pixels, got %r x %r' % (w, h)]
     w, h = int(w), int(h)
-    if w < 2 or h < 2 or w % 2 or h % 2:
+    if not (strip and w == 1) and (w < 2 or w % 2) or h < 2 or h % 2:
         problems.append('size %d x %d must be even and at least 2' % (w, h))
-    if root.get('viewBox') != '0 0 %d %d' % (w, h):
+    if native:
+        try:
+            view = [float(v) for v in root.get('viewBox', '').split()]
+        except ValueError:
+            view = []
+        if len(view) != 4 or view[2] <= 0 or view[3] <= 0:
+            problems.append('viewBox %r must be four numbers with a size' % root.get('viewBox'))
+        elif abs(view[2] * h - view[3] * w) > 1e-6 * view[2] * h and root.get('preserveAspectRatio') != 'none':
+            problems.append('viewBox %r has other proportions than %d x %d, so it must have preserveAspectRatio="none"'
+                            % (root.get('viewBox'), w, h))
+    elif root.get('viewBox') != '0 0 %d %d' % (w, h):
         problems.append('viewBox %r must be "0 0 %d %d"' % (root.get('viewBox'), w, h))
     ids = set()
     for el in root.iter():

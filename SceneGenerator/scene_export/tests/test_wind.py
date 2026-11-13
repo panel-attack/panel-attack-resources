@@ -19,8 +19,8 @@ def scene_doc():
     return {'drawables': [
         {'id': 'sky', 'filePath': 'EsmeTerrace/parts/sky/sky', 'position': {'x': 0, 'y': 0}},
         {'id': 'clouds', 'children': [
-            {'id': 'cloud high', 'filePath': 'EsmeTerrace/parts/clouds/cloud-high', 'position': {'x': 40, 'y': 20}},
-            {'id': 'cloud low', 'filePath': 'EsmeTerrace/parts/clouds/cloud-low', 'position': {'x': 300, 'y': 120}}]},
+            {'id': 'cloud high', 'filePath': 'EsmeTerrace/parts/clouds/cloud-high', 'position': {'x': 40, 'y': -33}},
+            {'id': 'cloud low', 'filePath': 'EsmeTerrace/parts/clouds/cloud-low', 'position': {'x': 500, 'y': 133}}]},
         {'id': 'urn', 'children': [
             {'id': 'urn body', 'filePath': 'EsmeTerrace/parts/urn/body', 'position': {'x': 10, 'y': 10}},
             {'id': 'urn bush edge 1', 'ref': 'plants/branches.json#branch-small-1',
@@ -30,7 +30,7 @@ def scene_doc():
             {'id': 'urn bush flower 1', 'ref': 'plants/flowers.json#flower-12-36',
              'overrides': {'position': {'x': 22, 'y': 28}, 'rotation': -0.2}},
             {'id': 'far bush edge 1', 'ref': 'plants/branches.json#branch-small-1',
-             'overrides': {'position': {'x': 700, 'y': 30}, 'rotation': 0.5}}]}]}
+             'overrides': {'position': {'x': 1167, 'y': 30}, 'rotation': 0.5}}]}]}
 
 
 def windy():
@@ -184,6 +184,14 @@ def test_a_plant_placed_at_the_left_edge_with_no_x_override_gets_the_wind_first(
     node = {'id': 'edge bush 1', 'ref': 'plants/branches.json#branch-small-1', 'overrides': overrides}
     [track] = wind.sway(node)
     assert track['steps'][0]['delaySeconds'] <= wind.WAVE_JITTER
+
+
+def test_a_plant_can_sway_after_the_delay_it_was_given():
+    node = {'id': 'urn bush 1', 'ref': 'plants/branches.json#branch-small-1', 'overrides': {'position': {'x': 900}}}
+    [track] = wind.sway(node, delay=0.25)
+    steps = track['steps']
+    assert steps[0]['delaySeconds'] == 0.25
+    assert sum(s['durationSeconds'] for s in steps) + 0.25 == pytest.approx(sum(s for s, _ in wind.WIND))
 
 
 def test_swaying_leaves_the_nodes_alone():

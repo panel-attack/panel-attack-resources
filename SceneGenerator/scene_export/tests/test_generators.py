@@ -107,7 +107,7 @@ def test_every_part_svg_is_in_the_generators_form(parts):
             assert svgtools.validate(p.svg) == [], p.path
 
 
-@pytest.mark.skipif(not os.path.exists(os.path.join(GAME_SCENES, 'EsmeTerrace', 'EsmeTerrace.json')),
+@pytest.mark.skipif(not os.path.exists(os.path.join(GAME_SCENES, 'MainMenu.json')),
                     reason='the scene has not been laid out')
 def test_every_image_path_in_the_game_files_has_its_png():
     drawables = []

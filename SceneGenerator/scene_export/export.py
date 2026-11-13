@@ -7,7 +7,7 @@ A name is a group (an object folder such as left-urn, or "left urn", or leaves),
 
 Pixelmator only opens files it was given access to, so each part SVG in build/parts/ is copied over the one
 file it opens, build/pixelmator/import.svg, then opened, exported as a PNG with transparency and closed
-without saving. The PNG goes into the game theme's scenes/ by the README's backup and manifest rules.
+without saving. The PNG goes into build/scenes/ by the README's backup and manifest rules; layout and stage copy it from there.
 The run stops at the first part that fails, after clearing any Pixelmator alert, and names the part."""
 
 import json
@@ -18,12 +18,19 @@ import sys
 
 from PIL import Image
 
-from . import BUILD, GAME_SCENES, GENERATOR, INDEX, STAGING, SVG_SCENES, required, store
+from . import BUILD, GENERATOR, INDEX, RENDERED, STAGING, SVG_SCENES, store
 
 SLOT = os.path.join(STAGING, 'import.svg')
 RENDERS = os.path.join(BUILD, 'png')
 APPLESCRIPT = os.path.join(GENERATOR, 'export_part.applescript')
 ALERTS = os.path.join(GENERATOR, 'pixelmator_alerts.sh')
+
+
+LICENSE = 'https://creativecommons.org/licenses/by-sa/4.0/'
+LICENSE_TAGS = {'XMP-cc:AttributionName': 'JamBox', 'XMP-cc:License': LICENSE, 'XMP-dc:Creator': 'JamBox',
+                'XMP-dc:Rights': 'Copyright, JamBox, 2026. This work is licensed under the Creative Commons Attribution '
+                                 'ShareAlike 4.0 International License. To view a copy of this license, visit '
+                                 + LICENSE}
 
 
 class Stop(Exception):
@@ -67,6 +74,13 @@ def check_png(path, w, h):
     return None
 
 
+def licensed(path):
+    """Writes the art's license into the PNG's XMP; returns why it couldn't, or None."""
+    r = subprocess.run(['exiftool', '-q', '-overwrite_original'] + ['-%s=%s' % kv for kv in LICENSE_TAGS.items()]
+                       + [path], capture_output=True, text=True)
+    return None if r.returncode == 0 else 'exiftool failed: %s' % (r.stderr or r.stdout).strip()
+
+
 def same_pixels(a, b):
     if not (os.path.exists(a) and os.path.exists(b)):
         return False
@@ -95,7 +109,7 @@ def export_one(part, timeout, st):
     if failure:
         cleared = alerts('dismiss')
         raise Stop('%s: %s\nPixelmator alerts: %s' % (part['path'], failure, cleared))
-    problem = check_png(out, w, h)
+    problem = check_png(out, w, h) or licensed(out)
     if problem:
         raise Stop('%s: %s' % (part['path'], problem))
     if same_pixels(out, dest) and not st.protected(dest):
@@ -150,7 +164,7 @@ def main(argv):
         for p in parts:
             print(p['path'], p['width'], p['height'])
         return 0
-    return render(parts, timeout, store.Store(required(GAME_SCENES, 'SCENE_GAME_THEME'), force=force, state=BUILD))
+    return render(parts, timeout, store.Store(RENDERED, force=force))
 
 
 if __name__ == '__main__':

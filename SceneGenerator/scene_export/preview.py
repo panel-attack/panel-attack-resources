@@ -5,7 +5,8 @@
 Refs resolve like the loader's (file part relative to the root like image paths, ids looked up across every
 file read, overrides applied recursively). Each node's transform is translate(position - anchor offset),
 then translate(pivot), rotate, scale, translate(-pivot), in scene units; @2x images are half their pixel
-size in units. The scene draws in document order, parents before their children. The output is at 2x (1536 x 1024 for EsmeTerrace)."""
+size in units, and an image given a size is stretched to it. The scene draws in document order, parents before their
+children. The output is the game's 1280 x 720 canvas at 2x, 2560 x 1440."""
 
 import copy
 import json
@@ -42,6 +43,11 @@ def offset(name, w, h):
     return fx * w, fy * h
 
 
+def stretched(node, has_texture=True):
+    """Whether the loader stretches the node's image to its size; a repeating image tiles over it instead."""
+    return has_texture and bool(node.get('size')) and node.get('wrap') != 'repeat'
+
+
 def node_matrix(node, w, h, has_texture=True):
     """The node's own transform; w, h are its image size in units."""
     pos = node.get('position') or {}
@@ -51,6 +57,10 @@ def node_matrix(node, w, h, has_texture=True):
     r = node.get('rotation', 0)
     c, s = math.cos(r), math.sin(r)
     sx, sy = node.get('xScale', 1), node.get('yScale', 1)
+    if stretched(node, has_texture):
+        size = node['size']
+        sx = size['width'] / w if 'width' in size else sx
+        sy = size['height'] / h if 'height' in size else sy
     m = translate(pos.get('x', 0) - ax + px, pos.get('y', 0) - ay + py)
     m = mul(m, (c, s, -s, c, 0, 0))
     m = mul(m, (sx, 0, 0, sy, 0, 0))
@@ -176,7 +186,7 @@ def render_nodes(scene, canvas, nodes, parent_m):
         render_nodes(scene, canvas, n.get('children', []), m)
 
 
-def render(scene_path, root=None, size=(1536, 1024)):
+def render(scene_path, root=None, size=(2560, 1440)):
     root = root or os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(scene_path))))
     scene = Scene(scene_path, root)
     canvas = np.zeros((size[1], size[0], 4), np.float32)

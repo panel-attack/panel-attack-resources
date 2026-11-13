@@ -3,6 +3,7 @@ that draw them. A part's path is where its PNG lives below the game's scenes/ fo
 '<file below scenes/>#<template id>' until game.py makes it relative to the file it is written into."""
 
 import copy
+import math
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -10,7 +11,11 @@ from dataclasses import dataclass
 
 from . import SHEETS, svgtools
 
-CANVAS = (1536, 1024)
+CANVAS = (1536, 1024)                   # the sheets' drawing, in px
+GAME_CANVAS = (1280, 720)               # the game's canvas, in units: 2560 x 1440 px at 2x
+UNITS = GAME_CANVAS[0] / CANVAS[0]      # canvas units a sheet px
+CROP = (GAME_CANVAS[1] - CANVAS[1] * UNITS) / 2     # the drawing is taller than the canvas: as much is cut off above
+                                                    # as below
 PAD = 4
 NS = '{%s}' % svgtools.SVG_NS
 
@@ -20,6 +25,7 @@ class Part:
     path: str           # relative to build/parts/, without extension or @2x
     svg: str
     box: tuple          # (x, y, w, h) px: where it sits on the 1536 x 1024 canvas (a template: around its stem)
+    strip: bool = False     # its PNG is one px wide, stretched across by its template's size
 
     @property
     def size(self):
@@ -35,10 +41,40 @@ def num(v, places=3):
     return int(v) if v == int(v) else v
 
 
-def placed_at(x, y):
-    """The overrides placing a ref's template at (x, y) scene units, for a template that sits at the origin: an axis
-    left at 0 is left out, and so is the position when both are."""
-    position = {axis: v for axis, v in (('x', num(x)), ('y', num(y))) if v != 0}
+def half(v):
+    return math.floor(v * 2 + 0.5) / 2
+
+
+def length(px):
+    """A sheet length in canvas units."""
+    return px * UNITS
+
+
+def point(x, y):
+    """Where the sheet point (x, y) px lands on the canvas, on half a unit, a whole pixel at 2x."""
+    return {'x': num(half(x * UNITS)), 'y': num(half(y * UNITS + CROP))}
+
+
+def corner(x, y):
+    """Where an image drawn upright at its size puts its top left, the sheet point (x, y) px, on the canvas: on a
+    whole unit, so it lands on whole pixels at 1x and 2x; half a unit rounds up."""
+    return {'x': num(math.floor(x * UNITS + 0.5)), 'y': num(math.floor(y * UNITS + CROP + 0.5))}
+
+
+def sheet_point(position):
+    """The sheet point (x, y) px a canvas position was placed from, to within its snapping."""
+    return position.get('x', 0) / UNITS, (position.get('y', 0) - CROP) / UNITS
+
+
+def offset(x, y):
+    """The sheet offset (x, y) px in canvas units, on half a unit."""
+    return {'x': num(half(x * UNITS)), 'y': num(half(y * UNITS))}
+
+
+def placed_at(position):
+    """The overrides placing a ref's template at position, for a template that sits at the origin: an axis left at 0
+    is left out, and so is the position when both are."""
+    position = {axis: v for axis, v in position.items() if v != 0}
     return {'position': position} if position else {}
 
 
@@ -95,7 +131,7 @@ def filtered(el, keep):
 
 
 def at(box):
-    return {'x': num(box[0] / 2), 'y': num(box[1] / 2)}
+    return corner(box[0], box[1])
 
 
 def image_node(node_id, part):
@@ -117,7 +153,7 @@ def marker_ref(g, file):
     x, y = (float(v) for v in g.get('data-at').split(','))
     sx, sy = (float(v) for v in g.get('data-scale').split(','))
     return {'id': g.get('id'), 'ref': file + '#' + g.get('data-template'),
-            'overrides': {'position': {'x': num(x / 2), 'y': num(y / 2)}, 'xScale': num(sx, 5), 'yScale': num(sy, 5)}}
+            'overrides': {'position': point(x, y), 'xScale': num(sx, 5), 'yScale': num(sy, 5)}}
 
 
 def origin(children):

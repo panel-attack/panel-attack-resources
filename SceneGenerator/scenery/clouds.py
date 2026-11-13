@@ -410,10 +410,10 @@ def bands():
 
 
 def speed(name):
-    """Scene units a second the cloud drifts, the same for every cloud at its depth so they stay spread out."""
+    """Canvas units a second the cloud drifts, the same for every cloud at its depth so they stay spread out."""
     for ((lo, hi), _, _), names in zip(CLOUD_BANDS, bands()):
         if name in names:
-            return wind.cloud_speed((lo + hi) / 4)
+            return wind.cloud_speed(cutting.length((lo + hi) / 2) + cutting.CROP)
 
 
 def places():
@@ -422,8 +422,8 @@ def places():
     edge for the wind to bring them in, clear of every cloud beside them at that depth."""
     rng = random.Random(CLOUD_PLACES)
     by_name = {c[0]: c for c in laid_out()}
-    lap, start, edge = 2 * wind.CLOUD_LAP, 2 * (wind.SCENE_SIZE[0] + wind.OUT_OF_SIGHT - wind.CLOUD_LAP), \
-        2 * wind.SCENE_SIZE[0]
+    lap, start, edge = (v / cutting.UNITS for v in (wind.CLOUD_LAP, wind.SCENE_SIZE[0] + wind.OUT_OF_SIGHT - wind.CLOUD_LAP,
+                                                    wind.SCENE_SIZE[0]))
     out = []
     for ((lo, hi), n, jitter), names in zip(CLOUD_BANDS, bands()):
         for _ in range(1000):

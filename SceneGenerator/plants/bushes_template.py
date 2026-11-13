@@ -3,17 +3,16 @@
 #
 #   python3 -m plants.bushes_template  ->  the game's scenes/plants/bushes.json
 
-from scene_export import cutting, layout, placed_foliage, wind
+from scene_export import cutting, layout
+from EsmeTerrace import placements
 
 OUTPUT = 'plants/bushes.json'
 TEMPLATES = {'corner bush': 'corner-bush'}
 
 
 def build():
-    children = placed_foliage.placed().children
-    return {'drawables': [cutting.object_template(tid, wind.swayed(placed_foliage.named_by_reference(obj, children[obj])))
-                          for obj, tid in TEMPLATES.items()]}
+    return {'drawables': [cutting.object_template(tid, placements.object_children(obj)) for obj, tid in TEMPLATES.items()]}
 
 
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)

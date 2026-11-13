@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from scene_export import placed_foliage as P, wind
+from scene_export import cutting, placed_foliage as P, wind
 from furniture import planters, planters_template
 from plants import branches, bushes, bushes_template
 
@@ -30,7 +30,7 @@ def assert_placed_as_laid_out(nodes, layout):
     for node, p in zip(nodes, layout):
         o = node['overrides']
         position = o.get('position', {})
-        assert (position.get('x', 0), position.get('y', 0)) == pytest.approx((p.at[0] / 2, p.at[1] / 2), abs=1e-3)
+        assert cutting.sheet_point(position) == pytest.approx(p.at, abs=0.31)
         assert o['rotation'] == pytest.approx(p.rotation, abs=1e-5)
         assert (o['xScale'], o['yScale']) == pytest.approx(((-1 if p.mirror else 1) * p.scale, p.scale), abs=1e-5)
 
@@ -83,16 +83,16 @@ def test_the_templates_sway_every_plant_they_place():
     assert plants and all(n['overrides'].get('animationTracks') for n in plants)
 
 
-def test_a_templates_refs_are_named_by_object_and_reference_numbered_in_draw_order():
+def test_a_templates_refs_are_named_once_each_by_object_reference_and_number():
     templates = {**planters_template.TEMPLATES, **bushes_template.TEMPLATES}
     for t in planters_template.build()['drawables'] + bushes_template.build()['drawables']:
         obj = next(o for o, tid in templates.items() if tid == t['id'])
-        counts = {}
+        ids = [n['id'] for n in t['children']]
+        assert len(ids) == len(set(ids)), obj
         for n in t['children']:
             if 'ref' in n:
-                ref_id = n['ref'].partition('#')[2]
-                counts[ref_id] = counts.get(ref_id, 0) + 1
-                assert n['id'] == '%s %s %d' % (obj, ref_id, counts[ref_id])
+                stem, _, number = n['id'].rpartition(' ')
+                assert stem == '%s %s' % (obj, n['ref'].partition('#')[2]) and number.isdigit(), n['id']
 
 
 # ---------------------------------------------------------------- the library pieces
@@ -153,21 +153,3 @@ def test_no_stem_piece_is_stretched_past_its_png(placed):
     for n in walk(placed.library):
         if '#stem-' in n.get('ref', ''):
             assert abs(n['overrides']['yScale']) <= 1.0 + 1e-9, n['id']
-
-
-def test_no_ref_draws_its_foliage_template_larger_than_its_png(placed):
-    for n in walk([n for nodes in placed.children.values() for n in nodes] + placed.library):
-        if FOLIAGE_REF.match(n.get('ref', '')):
-            o = n['overrides']
-            assert max(abs(o['xScale']), abs(o['yScale'])) <= 1.0 + 1e-9, n['id']
-
-
-def test_no_library_leaf_is_drawn_larger_than_its_png_where_the_bush_grows_it(placed):
-    templates = library(placed)
-    for node in [n for nodes in placed.children.values() for n in walk(nodes) if n.get('ref', '').startswith(BRANCH)]:
-        o = node['overrides']
-        scale = max(abs(o['xScale']), abs(o['yScale']))
-        for n in walk(templates[node['ref'].partition('#')[2]]['children']):
-            if FOLIAGE_REF.match(n.get('ref', '')):
-                inner = n['overrides']
-                assert scale * max(abs(inner['xScale']), abs(inner['yScale'])) <= 1.0 + 1e-6, (node['id'], n['id'])

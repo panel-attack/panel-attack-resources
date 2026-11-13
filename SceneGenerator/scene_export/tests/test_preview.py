@@ -19,3 +19,13 @@ def test_a_scene_previews_from_its_theme_folder_when_no_root_is_given(tmp_path):
     write(tmp_path / 'scenes/plants/leaves.json', {'drawables': [{'id': 'leaf', 'templateOnly': True}]})
     write(tmp_path / 'scenes/Esme/Esme.json', {'drawables': [{'id': 'a', 'ref': 'scenes/plants/leaves.json#leaf'}]})
     assert preview.render(str(tmp_path / 'scenes/Esme/Esme.json'), size=(4, 4)).size == (4, 4)
+
+
+def test_an_image_given_a_width_stretches_to_it_like_the_loader():
+    a, _, _, d, _, _ = preview.node_matrix({'size': {'width': 1280}, 'pivot': 'topLeft'}, 2, 853)
+    assert (a, d) == (640, 1)
+
+
+def test_a_repeating_image_given_a_width_tiles_over_it_unstretched():
+    a, _, _, d, _, _ = preview.node_matrix({'size': {'width': 1280}, 'wrap': 'repeat'}, 2, 853)
+    assert (a, d) == (1, 1)

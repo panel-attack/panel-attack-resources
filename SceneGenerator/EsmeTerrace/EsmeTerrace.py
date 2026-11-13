@@ -7,12 +7,12 @@
 #
 #   python3 -m EsmeTerrace.EsmeTerrace  ->  the game's scenes/EsmeTerrace/EsmeTerrace.json
 
-from scene_export import cutting, layout, placed_foliage, wind
+from scene_export import cutting, layout, wind
 from scenery import clouds, clouds_template, landscape, landscape_template, sky, sky_template
 from structures import houses, houses_template
 from plants import bushes_template
 from furniture import planters_template, table_set, table_set_template
-from EsmeTerrace import background, floor, rail, shadows
+from EsmeTerrace import background, floor, placements, rail, shadows
 
 OUTPUT = 'EsmeTerrace/EsmeTerrace.json'
 
@@ -25,7 +25,7 @@ def drifting_clouds():
     children = []
     for cid, part in clouds.cut():
         node = cutting.image_ref(cid, clouds_template.OUTPUT, clouds_template.template_id(cid), part)
-        node['overrides']['animationTracks'] = wind.drift(node['overrides'], part.box[2] / 2, clouds.speed(cid))
+        node['overrides']['animationTracks'] = wind.drift(node['overrides'], cutting.length(part.box[2]), clouds.speed(cid))
         children.append(node)
     return {'id': 'clouds', 'children': children}
 
@@ -59,13 +59,15 @@ def on_its_shadow(obj, shadow, file, template_id, children):
                                     cutting.object_ref(obj + ' object', file, template_id, children)]}
 
 
-def build():
+def generated():
+    """The terrace as the generators draw it, before the scene-editor edits."""
     drawn = by_id(background.cut()[1])
     shadow = shadows.cut()
-    placed = placed_foliage.placed().children
-    objects = [(obj, planters_template.OUTPUT, tid, placed[obj]) for obj, tid in planters_template.TEMPLATES.items()]
+    objects = [(obj, planters_template.OUTPUT, tid, placements.object_children(obj))
+               for obj, tid in planters_template.TEMPLATES.items()]
     objects.append(('table set', table_set_template.OUTPUT, table_set_template.TEMPLATE, table_set.cut()[1]))
-    objects += [(obj, bushes_template.OUTPUT, tid, placed[obj]) for obj, tid in bushes_template.TEMPLATES.items()]
+    objects += [(obj, bushes_template.OUTPUT, tid, placements.object_children(obj))
+                for obj, tid in bushes_template.TEMPLATES.items()]
     return {'drawables': [
         cutting.image_ref('sky', sky_template.OUTPUT, sky_template.TEMPLATE, sky.parts()[0]),
         drifting_clouds(),
@@ -82,5 +84,9 @@ def build():
     ] + [on_its_shadow(obj, shadow[obj], file, tid, children) for obj, file, tid, children in objects]}
 
 
+def build():
+    return {'drawables': placements.terrace(generated()['drawables'])}
+
+
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)

@@ -1,15 +1,21 @@
 """python3 -m scene_export render [part or group ...] [--all] [--force PATH ...] [--timeout S]
 python3 -m scene_export layout [file ...]
+python3 -m scene_export stage <scene file> <stage folder> [--pngs FOLDER]
 
 render writes SVG and PNG, never JSON. It runs every IMAGE_MODULES generator that draws a sheet into build/sheets/, writes each
-module's part SVGs into build/parts/ at their PNG's path (with build/index.json listing them),
-then renders through Pixelmator Pro the PNGs into the game theme's scenes/: the named parts, or every part with
---all, else the parts whose SVG changed or whose PNG is missing. It never touches the scene JSON. --force paths
-are PNGs below the theme's scenes/ to replace though they were edited.
+module's part SVGs, drawn at their native size (native.py), into build/parts/ at their PNG's
+path (with build/index.json listing them),
+then renders through Pixelmator Pro the PNGs into build/scenes/: the named parts, or every part with --all, else
+the parts whose SVG changed or whose PNG is missing. It never touches the scene JSON. --force paths are PNGs below
+build/scenes/ to replace though they were edited.
 
-layout writes JSON, never SVG or PNG: each JSON_MODULES generator's file into the game theme's scenes/, or only
-the named files. Run it to make a file once; after that the file is edited in the scene editor or by hand. A
-file whose bytes differ from the new output is moved to build/.backup/ first."""
+layout writes JSON and copies PNG: the main menu's file and the files it draws, holding only the templates it
+draws, into the game theme's scenes/, or only the named ones among them, with the PNGs from build/scenes/ they
+draw. Scenes the main menu doesn't draw stay out of the theme. A file whose bytes differ from the new output is
+moved to build/.backup/ first, and a PNG edited since layout copied it is left alone.
+
+stage writes the scene file, as layout makes it, as a stage folder (stage.py): background.json one canvas container
+holding the scene, the template files it draws, and their PNGs, copied from build/scenes/ or --pngs."""
 
 import importlib
 import json
@@ -17,7 +23,7 @@ import os
 import subprocess
 import sys
 
-from . import GAME_SCENES, GENERATOR, INDEX, SVG_SCENES, export, layout, store, svgtools
+from . import GENERATOR, INDEX, RENDERED, SVG_SCENES, export, layout, native, stage, store, svgtools
 
 # each makes the parts in the parts/ folder beside it; one with a main() draws the sheet SVG beside itself first
 IMAGE_MODULES = ['scenery.sky', 'scenery.clouds', 'scenery.landscape', 'structures.houses', 'plants.trees',
@@ -53,7 +59,7 @@ def write_build(parts, root, index):
     this one doesn't are removed, and no others. Returns the paths of the parts whose SVG changed."""
     keep, changed = set(), []
     for p in parts:
-        problems = svgtools.validate(p.svg)
+        problems = svgtools.validate(p.svg, p.strip, native=True)
         if problems:
             raise SystemExit('%s: %s' % (p.path, '; '.join(problems)))
         path = os.path.join(root, p.path + '.svg')
@@ -81,15 +87,6 @@ def to_render(index, names, every, changed, has_png):
     if names:
         return export.select(index, names)
     return [p for p in index if p['path'] in changed or not has_png(p['path'])]
-
-
-def layout_modules(modules, names):
-    """The modules writing the named files, or all of them."""
-    files = {m.OUTPUT: m for m in modules}
-    unknown = [n for n in names if n not in files]
-    if unknown:
-        raise SystemExit('layout makes no %s; it makes %s' % (', '.join(unknown), ', '.join(sorted(files))))
-    return [m for rel, m in files.items() if not names or rel in names]
 
 
 def parse(argv):
@@ -121,23 +118,39 @@ def draw_sheets():
 def render(argv):
     names, force, timeout, every = parse(argv)
     modules = draw_sheets()
-    parts = [p for m in modules for p in m.parts()]
+    _, _, resolutions, anchors = layout.planned()
+    parts = [native.native_part(p, resolutions.get(p.path, (1, 1)), anchors.get(p.path, 'topLeft'))
+             for m in modules for p in m.parts()]
     changed = write_build(parts, SVG_SCENES, INDEX)
     print('%d part SVGs in %s, %d changed' % (len(parts), SVG_SCENES, len(changed)))
     with open(INDEX) as f:
         index = json.load(f)
     chosen = to_render(index, names, every, changed,
-                       lambda path: os.path.exists(os.path.join(GAME_SCENES, path + '@2x.png')))
+                       lambda path: os.path.exists(os.path.join(RENDERED, path + '@2x.png')))
     if not chosen:
         print('no PNGs to render')
         return 0
-    return export.render(chosen, timeout, store.Store(GAME_SCENES, force=force, state=GENERATOR))
+    return export.render(chosen, timeout, store.Store(RENDERED, force=force))
 
 
 def write_layout(names):
-    st = store.Store(GAME_SCENES, state=GENERATOR)
-    for m in layout_modules([importlib.import_module(m) for m in JSON_MODULES], names):
-        layout.write(m.OUTPUT, m.build(), st)
+    layout.write(*names)
+    return 0
+
+
+def write_stage(argv):
+    pngs = RENDERED
+    if '--pngs' in argv:
+        i = argv.index('--pngs')
+        pngs, argv = argv[i + 1], argv[:i] + argv[i + 2:]
+    if len(argv) != 2:
+        raise SystemExit(__doc__)
+    scene, out = argv
+    if scene not in layout.SCENES:
+        raise SystemExit('stage makes no %s; it makes %s' % (scene, ', '.join(layout.SCENES)))
+    _, docs, _, _ = layout.planned()
+    stage.write(docs, scene, out, pngs)
+    print('stage    %s from %s' % (out, scene))
     return 0
 
 
@@ -146,6 +159,8 @@ def main(argv):
         return render(argv[1:])
     if argv[:1] == ['layout']:
         return write_layout(argv[1:])
+    if argv[:1] == ['stage']:
+        return write_stage(argv[1:])
     print(__doc__)
     return 2
 

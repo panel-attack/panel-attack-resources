@@ -1,20 +1,17 @@
 """Library, writes nothing: the planters and the corner bush cut into their images and the refs placing their
 library pieces and foliage, branches.py's library pieces as templates drawn from the foliage templates, and
-the leaf, flower, rose and stem templates all of them place, with the resolution each template's PNG is drawn
-at so no ref draws it larger than its PNG.
+the leaf, flower, rose and stem templates all of them place; native.py picks the size each PNG is exported at.
 
 Inside a bush, the stems foliage.py draws between leaves are lifted into the bush's own image under every
 leaf; side-by-side renders show no visible difference, and it keeps the stems out of the refs."""
 
-import dataclasses
 import functools
-import math
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
 from . import svgtools, templates as T
 from .capture import Foliage, build_bush, build_planters
-from .cutting import NS, Part, find_group, image_node, load, num, placed_at, slug, static_part
+from .cutting import NS, UNITS, Part, find_group, half, image_node, load, num, offset, placed_at, point, slug, static_part
 from plants import branches, foliage
 from furniture import planters
 
@@ -37,7 +34,6 @@ class Placed:
     parts: dict         # object: its images
     library: list       # branches.py's pieces as templates
     templates: dict     # foliage template id: templates.Template
-    resolution: dict    # foliage template id: how much larger than its template size its PNG is drawn
 
 
 def foliage_group(template_id):
@@ -59,22 +55,12 @@ def kind_name(record):
     return KIND_NAMES[record.kind]
 
 
-def template_resolution(largest_scale):
-    """How much larger than its template size a template is drawn, so no instance scales its PNG up."""
-    return max(1.0, math.ceil(largest_scale * 4 - 1e-9) / 4)
-
-
-def template_part(t, resolution=1.0):
-    """The template's PNG part, drawn resolution times its template size about the stem."""
+def template_part(t):
+    """The template's PNG part, drawn at its template size about the stem."""
     out = planters.Out()
     out.add_all(t.shapes(stem=(0, 0)))
     g = ET.fromstring('<g xmlns="%s">%s</g>' % (svgtools.SVG_NS, '\n'.join(out.body)))
     elements = list(g)
-    if resolution != 1.0:
-        for e in elements:
-            e.set('d', svgtools.scale_path(e.get('d'), resolution))
-            if e.get('stroke-width'):
-                e.set('stroke-width', svgtools.fmt(float(e.get('stroke-width')) * resolution))
     grads = {}
     for k, (a, b) in out.gradients.items():
         lg = ET.Element('linearGradient', {'id': k, 'x1': '0', 'y1': '0', 'x2': '0', 'y2': '1'})
@@ -103,7 +89,7 @@ def piece_node(g):
     x, y = (float(v) for v in g.get('data-at').split(','))
     scale = float(g.get('data-scale'))
     return {'id': g.get('id'), 'ref': BRANCHES + '#' + g.get('data-piece'),
-            'overrides': {**placed_at(x / 2, y / 2),
+            'overrides': {**placed_at(point(x, y)),
                           'rotation': num(float(g.get('data-rotation')), 5),
                           'xScale': num(-scale if g.get('data-mirror') else scale, 5), 'yScale': num(scale, 5)}}
 
@@ -122,23 +108,19 @@ def sub_label(obj, sid):
 class Cutter:
     def __init__(self):
         self.templates = {}
-        self.placed = []        # (template id, the ref placing it)
-        self.pieces = []        # (piece id, the ref placing it)
 
-    def instance(self, obj, label, record, counters, origin=(0.0, 0.0)):
-        """The ref placing a recorded leaf or flower's template, relative to origin (screen px)."""
+    def instance(self, obj, label, record, counters, at=point):
+        """The ref placing a recorded leaf or flower's template where at(x, y) puts its sheet point."""
         pl = T.place(record)
         t = pl.template
         self.templates.setdefault(t.id, t)
         kind = kind_name(record)
         key = (label, kind)
         counters[key] = counters.get(key, 0) + 1
-        pl = dataclasses.replace(pl, x=pl.x - origin[0], y=pl.y - origin[1])
         node = {'id': ' '.join(x for x in (obj, label, kind, str(counters[key])) if x),
                 'ref': foliage_file(t.id) + '#' + t.id,
-                'overrides': {**placed_at(pl.x / 2, pl.y / 2), 'rotation': num(pl.rotation, 5),
+                'overrides': {**placed_at(at(pl.x, pl.y)), 'rotation': num(pl.rotation, 5),
                               'xScale': num(pl.xscale, 5), 'yScale': num(pl.yscale, 5)}}
-        self.placed.append((t.id, node))
         return node
 
     def planter(self, obj, group, gradients, records, owner, folder):
@@ -188,7 +170,6 @@ class Cutter:
             for kind, el in foliage_items(sub):
                 if kind == 'piece':
                     node = piece_node(el)
-                    self.pieces.append((el.get('data-piece'), node))
                     children.append(node)
                     continue
                 name = owner.get(el.get('id'))
@@ -213,43 +194,16 @@ class Cutter:
                     base=d.base, angle=d.angle, length=d.length, tone=tone, bend=d.bend, width=d.width,
                     stroke=branches.LEAF_STROKE, gloss=d.gloss, shade=foliage.LEAF_SHADE_DEEP[tone]))
             if d.group is None:
-                children.append(self.instance(piece.id, '', record, counters))
+                children.append(self.instance(piece.id, '', record, counters, offset))
                 continue
             if d.group not in groups:
-                groups[d.group] = {'id': '%s %s' % (piece.id, d.group),
-                                   'position': {'x': num(d.base[0] / 2), 'y': num(d.base[1] / 2)}, 'children': []}
+                groups[d.group] = {'id': '%s %s' % (piece.id, d.group), 'position': offset(*d.base), 'children': []}
                 children.append(groups[d.group])
             g = groups[d.group]
-            o = (g['position']['x'] * 2, g['position']['y'] * 2)
-            g['children'].append(self.instance(piece.id, d.group, record, counters, o))
+            o = g['position']['x'], g['position']['y']
+            g['children'].append(self.instance(piece.id, d.group, record, counters, lambda x, y, o=o: {
+                'x': num(half(x * UNITS - o[0])), 'y': num(half(y * UNITS - o[1]))}))
         return {'id': piece.id, 'templateOnly': True, 'children': children}
-
-    def resolutions(self, piece_instances):
-        largest = {}
-        for tid, node in self.placed:
-            o = node['overrides']
-            largest[tid] = max(largest.get(tid, 0), abs(o['xScale']), abs(o['yScale']))
-        # a leaf of a piece the bush grows larger is drawn larger than the piece itself draws it
-        for pid, node in self.pieces:
-            scale = max(abs(node['overrides']['xScale']), abs(node['overrides']['yScale']))
-            for tid, inner in piece_instances[pid]:
-                o = inner['overrides']
-                largest[tid] = max(largest[tid], scale * abs(o['xScale']), scale * abs(o['yScale']))
-        return {tid: template_resolution(largest.get(tid, 1.0)) for tid in self.templates}
-
-
-def named_by_reference(obj, nodes):
-    """The nodes with each ref named for the object and the template it places, numbered in draw order:
-    which bush a piece grows on only matters while cutting, not to whoever edits the template."""
-    counts = {}
-
-    def named(n):
-        if 'ref' not in n:
-            return n
-        ref_id = n['ref'].partition('#')[2]
-        counts[ref_id] = counts.get(ref_id, 0) + 1
-        return {**n, 'id': '%s %s %d' % (obj, ref_id, counts[ref_id])}
-    return [named(n) for n in nodes]
 
 
 def owners(records):
@@ -270,28 +224,18 @@ def placed():
         parts[obj], children[obj] = cutter.planter(obj, find_group(root, group_id), grads, records[sheet],
                                                    owners(records[sheet]), folder)
 
-    library, piece_instances = [], {}
-    for p in branches.library():
-        before = len(cutter.placed)
-        library.append(cutter.library_piece(p))
-        piece_instances[p.id] = cutter.placed[before:]
+    library = [cutter.library_piece(p) for p in branches.library()]
     for length_name in branches.STEM_LENGTHS:
         for width_name in branches.STEM_WIDTHS:
             t = T.StemTemplate(length_name, width_name)
             cutter.templates.setdefault(t.id, t)
-
-    resolution = cutter.resolutions(piece_instances)
-    for tid, node in cutter.placed:
-        o = node['overrides']
-        o['xScale'] = num(o['xScale'] / resolution[tid], 5)
-        o['yScale'] = num(o['yScale'] / resolution[tid], 5)
-    return Placed(children, parts, library, cutter.templates, resolution)
+    return Placed(children, parts, library, cutter.templates)
 
 
 def template_parts(group):
     """The PNG parts of the foliage templates in one of the plants' foliage files."""
     p = placed()
-    return [template_part(p.templates[tid], p.resolution[tid]) for tid in sorted(p.templates)
+    return [template_part(p.templates[tid]) for tid in sorted(p.templates)
             if foliage_group(tid) == group]
 
 

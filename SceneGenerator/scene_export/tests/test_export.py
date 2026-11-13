@@ -66,9 +66,11 @@ def test_a_part_is_rendered_from_its_svg_and_its_png_goes_into_the_game_scenes_f
     monkeypatch.setattr(export, 'SVG_SCENES', str(svgs))
     monkeypatch.setattr(export, 'RENDERS', str(tmp_path / 'png'))
     monkeypatch.setattr(export, 'SLOT', str(tmp_path / 'slot.svg'))
-    opened = []
+    opened, run = [], export.subprocess.run
 
     def fake_osascript(args, **kw):
+        if args[0] != 'osascript':
+            return run(args, **kw)
         opened.append((args[2], open(args[2]).read()))
         Image.new('RGBA', (4, 2), (255, 0, 0, 255)).save(args[3])
 
@@ -79,3 +81,37 @@ def test_a_part_is_rendered_from_its_svg_and_its_png_goes_into_the_game_scenes_f
     assert export.export_one(part, 5, store.Store(str(game), state=str(tmp_path / 'gen'))) == 'written'
     assert opened == [(str(tmp_path / 'slot.svg'), '<svg/>')]
     assert (game / 'structures/parts/houses/house-manor@2x.png').exists()
+
+
+def test_a_rendered_png_carries_its_license(tmp_path, monkeypatch):
+    import json
+    import subprocess
+    from PIL import Image
+    part = {'path': 'structures/parts/houses/house-manor', 'svg': 'structures/parts/houses/house-manor.svg',
+            'width': 4, 'height': 2}
+    svgs, game = tmp_path / 'Scenes', tmp_path / 'scenes'
+    (svgs / 'structures/parts/houses').mkdir(parents=True)
+    (svgs / 'structures/parts/houses/house-manor.svg').write_text('<svg/>')
+    monkeypatch.setattr(export, 'SVG_SCENES', str(svgs))
+    monkeypatch.setattr(export, 'RENDERS', str(tmp_path / 'png'))
+    monkeypatch.setattr(export, 'SLOT', str(tmp_path / 'slot.svg'))
+    run = subprocess.run
+
+    def fake_osascript(args, **kw):
+        if args[0] != 'osascript':
+            return run(args, **kw)
+        Image.new('RGBA', (4, 2), (255, 0, 0, 255)).save(args[3])
+
+        class Done:
+            returncode, stdout, stderr = 0, 'ok', ''
+        return Done()
+    monkeypatch.setattr(export.subprocess, 'run', fake_osascript)
+    export.export_one(part, 5, store.Store(str(game), state=str(tmp_path / 'gen')))
+
+    png = str(game / 'structures/parts/houses/house-manor@2x.png')
+    tags = json.loads(run(['exiftool', '-j', '-XMP-cc:all', '-XMP-dc:all', png], capture_output=True, text=True).stdout)[0]
+    assert tags['AttributionName'] == 'JamBox' and tags['Creator'] == 'JamBox'
+    assert tags['License'] == 'https://creativecommons.org/licenses/by-sa/4.0/'
+    assert tags['Rights'] == ('Copyright, JamBox, 2026. This work is licensed under the Creative Commons Attribution '
+                              'ShareAlike 4.0 International License. To view a copy of this license, visit '
+                              'https://creativecommons.org/licenses/by-sa/4.0/')

@@ -3,17 +3,16 @@
 #
 #   python3 -m furniture.planters_template  ->  the game's scenes/furniture/planters.json
 
-from scene_export import cutting, layout, placed_foliage, wind
+from scene_export import cutting, layout
+from EsmeTerrace import placements
 
 OUTPUT = 'furniture/planters.json'
 TEMPLATES = {'crystal planter': 'crystal-planter', 'left urn': 'left-urn', 'right urn': 'right-urn'}
 
 
 def build():
-    children = placed_foliage.placed().children
-    return {'drawables': [cutting.object_template(tid, wind.swayed(placed_foliage.named_by_reference(obj, children[obj])))
-                          for obj, tid in TEMPLATES.items()]}
+    return {'drawables': [cutting.object_template(tid, placements.object_children(obj)) for obj, tid in TEMPLATES.items()]}
 
 
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)
