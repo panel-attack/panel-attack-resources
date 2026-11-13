@@ -5,7 +5,7 @@
 #   python3 -m structures.train_template  ->  the game's scenes/structures/train.json
 #
 #   The train template's origin is TRAIN_ORIGIN: the rear of the last carriage, on the rail tops, so a scene standing
-#   the train on a track places the ref at y = rail top / 2. Each wheel spins about its centre, its axle, one turn
+#   the train on a track places the ref where cutting.corner puts the rail top. Each wheel spins about its centre, its axle, one turn
 #   per circumference rolled at TRAIN_SPEED, clockwise as the train runs to the right, each from its own starting
 #   angle so the spokes don't all line up; the driving wheels one rod couples share one angle. The connecting rod
 #   circles with the crank pins from that angle: its x and y tracks are the cosine and sine of the wheel's turn,
@@ -28,19 +28,19 @@ from structures import train
 OUTPUT = 'structures/train.json'
 
 TRAIN_ORIGIN = (train.CARRIAGE_LEFTS[0] - 1, train.RAIL_Y)      # sheet px: the template's (0, 0)
-SMOKE_RISE = (-24, -62)          # scene units a puff drifts back and rises over its life
+SMOKE_RISE = (-40, -310 / 3)     # canvas units a puff drifts back and rises over its life
 SMOKE_SCALE = (0.55, 2.4)        # a puff's scale when it leaves the funnel and when it is gone
 SMOKE_SECONDS = 3.2              # a puff's life
 SMOKE_ALPHA = 0.9                # a fresh puff's opacity; it fades to nothing at the end of its life
 SMOKE_FADE_IN = 0.25             # seconds a puff takes to appear at the funnel mouth
 SMOKE_SNAP = 0.02                # seconds a spent, invisible puff takes to snap back to the funnel
-SMOKE_PUFFS = [                  # (image, radians it is turned, extra drift (x, y) in scene units, size, mirrored)
+SMOKE_PUFFS = [                  # (image, radians it is turned, extra drift (x, y) in canvas units, size, mirrored)
     ('train-smoke-1', 0.0, (0, 0), 1.0, False),
-    ('train-smoke-2', 0.7, (-5, 3), 0.88, True),
-    ('train-smoke-3', -0.55, (4, -4), 1.1, False),
-    ('train-smoke-4', 1.35, (-2, 2), 0.95, False),
-    ('train-smoke-5', 0.25, (2, -2), 1.0, True),
-    ('train-smoke-2', -1.1, (-4, 4), 0.9, False),
+    ('train-smoke-2', 0.7, (-25 / 3, 5), 0.88, True),
+    ('train-smoke-3', -0.55, (20 / 3, -20 / 3), 1.1, False),
+    ('train-smoke-4', 1.35, (-10 / 3, 10 / 3), 0.95, False),
+    ('train-smoke-5', 0.25, (10 / 3, -10 / 3), 1.0, True),
+    ('train-smoke-2', -1.1, (-20 / 3, 20 / 3), 0.9, False),
 ]
 SMOKE_TURN = 0.35                # radians a puff turns over its life, alternately each way
 WHEEL_STARTS = (0.0, 0.35, 0.8, 0.17, 0.62, 0.95, 0.5)   # radians each free wheel starts turned, in turn
@@ -78,7 +78,7 @@ def wheel_refs(images):
         k = len(out)
         start = wheel_start(tid, k, x)
         out.append({'id': gid, 'ref': OUTPUT + '#' + tid,
-                    'overrides': {'position': {'x': num(x / 2), 'y': num(y / 2)}, 'rotation': num(start, 6),
+                    'overrides': {'position': cutting.point(x, y), 'rotation': num(start, 6),
                                   'animationTracks': [spin_track(turn_seconds(tid), start)]}})
     return out
 
@@ -97,7 +97,7 @@ def gear_refs(images):
         way = -1 if k % 2 else 1
         start = GEAR_STARTS[k % len(GEAR_STARTS)]
         out.append({'id': gid, 'ref': OUTPUT + '#' + tid,
-                    'overrides': {'position': {'x': num(x / 2), 'y': num(y / 2)}, 'rotation': num(start, 6),
+                    'overrides': {'position': cutting.point(x, y), 'rotation': num(start, 6),
                                   'animationTracks': [spin_track(gear_turn_seconds(tid), start, way)]}})
     return out
 
@@ -105,7 +105,7 @@ def gear_refs(images):
 def crank_at(bx, by, angle):
     """Where the rod's image sits when the crank pins are turned angle radians from pointing ahead of the axles,
     where the image was drawn."""
-    r = train.CRANK_R / 2
+    r = cutting.length(train.CRANK_R)
     return bx - r + r * math.cos(angle), by + r * math.sin(angle)
 
 
@@ -127,10 +127,14 @@ def crank_tracks(bx, by):
 def rod_base(rod_id):
     """Template units: where the rod image of this rod sits with the pins pointing ahead, as it was drawn."""
     k = int(rod_id.split()[-1]) - 1
-    x, y, _, _ = dict(train.cut())['train-rod'].box
-    pair = train.ROD_PAIRS[k]
-    return (num(x / 2 + (pair[0] - train.ROD_PAIRS[0][0]) / 2 - TRAIN_ORIGIN[0] / 2),
-            num(y / 2 - TRAIN_ORIGIN[1] / 2))
+    at = cutting.at(dict(train.cut())['train-rod'].box)
+    o = cutting.corner(*TRAIN_ORIGIN)
+    return num(rod_x(at['x'], train.ROD_PAIRS[k]) - o['x']), num(at['y'] - o['y'])
+
+
+def rod_x(x, pair):
+    """Where the rod image of the rod for pair sits, the first rod's image at x."""
+    return cutting.half(x + cutting.length(pair[0] - train.ROD_PAIRS[0][0]))
 
 
 def rod_refs(images):
@@ -140,7 +144,7 @@ def rod_refs(images):
     for k, pair in enumerate(train.ROD_PAIRS):
         node = cutting.image_ref('train rod %d' % (k + 1), OUTPUT, 'train-rod', part)
         at = node['overrides']['position']
-        bx, by = at['x'] + (pair[0] - train.ROD_PAIRS[0][0]) / 2, at['y']
+        bx, by = rod_x(at['x'], pair), at['y']
         x, y = crank_at(bx, by, DRIVE_START_QUARTERS * math.pi / 2)
         node['overrides']['position'] = {'x': num(x), 'y': num(y)}
         node['overrides']['animationTracks'] = crank_tracks(bx, by)
@@ -156,7 +160,8 @@ def smoke_phase(k):
 def smoke_state(k, t):
     """A puff's x, y, scales and rotation t of the way through its life."""
     image, turned, (ex, ey), size, mirrored = SMOKE_PUFFS[k]
-    cx, cy = (v / 2 for v in train.SMOKE_AT)
+    mouth = cutting.point(*train.SMOKE_AT)
+    cx, cy = mouth['x'], mouth['y']
     dx, dy = SMOKE_RISE[0] + ex, SMOKE_RISE[1] + ey
     scale = (SMOKE_SCALE[0] + (SMOKE_SCALE[1] - SMOKE_SCALE[0]) * t) * size
     turn = turned + SMOKE_TURN * t * (-1 if k % 2 else 1)
@@ -198,7 +203,7 @@ def flag_refs(images):
     swing, swing_seconds, ripple, ripple_seconds = FLAG_FLUTTER
     x, y = train.FLAG_HANG
     return [{'id': 'train flag', 'ref': OUTPUT + '#train-flag', 'overrides': {
-        'position': {'x': num(x / 2), 'y': num(y / 2)}, 'rotation': num(-swing, 4), 'xScale': 1,
+        'position': cutting.point(x, y), 'rotation': num(-swing, 4), 'xScale': 1,
         'animationTracks': [
             {'repeat': 'yoyo', 'steps': [{'durationSeconds': swing_seconds, 'easeType': 'sineinout',
                                           'animateProperties': {'rotation': num(swing, 4)}}]},
@@ -221,7 +226,8 @@ def train_template():
     images = dict(train.cut())
     children = (shadow_refs(images) + wheel_refs(images) + body_refs(images) + gear_refs(images) + rod_refs(images)
                 + flag_refs(images) + smoke_refs(images))
-    origin = (TRAIN_ORIGIN[0] / 2, TRAIN_ORIGIN[1] / 2)
+    o = cutting.corner(*TRAIN_ORIGIN)
+    origin = o['x'], o['y']
     return {'id': 'train', 'templateOnly': True, 'children': cutting.shifted(children, origin)}
 
 
@@ -239,4 +245,4 @@ def build():
 
 
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)

@@ -44,7 +44,7 @@ SKY_CLOUDS = [
 ]
 TRAIN_LENGTH = max(part.box[0] + part.box[2] for tid, part in train.cut()
                    if tid == 'train-loco') - train_template.TRAIN_ORIGIN[0]  # sheet px, rear to the loco's front
-TRAIN_CLEAR = 30                    # scene units past each edge the train starts and ends, so its smoke is gone too
+TRAIN_CLEAR = 50                    # canvas units past each edge the train starts and ends, so its smoke is gone too
 TRAIN_WAIT = 12                     # seconds out of sight before the next crossing
 HANGER_TEMPLATES = ['lantern-tree-' + name for name in lantern_tree.HANGERS]
 HANGER_SWING = {'lantern-tree-lantern-left': (0.07, 2.6),
@@ -65,7 +65,7 @@ def drifting_clouds():
         node = cutting.image_ref(cid, clouds_template.OUTPUT, clouds_template.template_id(cid), part)
         if alpha < 1:
             node['overrides']['alpha'] = alpha
-        node['overrides']['animationTracks'] = wind.drift(node['overrides'], part.box[2] / 2, clouds.speed(cid))
+        node['overrides']['animationTracks'] = wind.drift(node['overrides'], cutting.length(part.box[2]), clouds.speed(cid))
         children.append(node)
     return {'id': 'clouds', 'children': children}
 
@@ -88,12 +88,12 @@ def land(names):
 
 
 def crossing_train():
-    start = -TRAIN_LENGTH / 2 - TRAIN_CLEAR
+    start = -cutting.length(TRAIN_LENGTH) - TRAIN_CLEAR
     end = wind.SCENE_SIZE[0] + TRAIN_CLEAR
     return {'id': 'crossing train', 'ref': train_template.OUTPUT + '#train', 'overrides': {
-        'position': {'x': num(start), 'y': num(train.RAIL_Y / 2)},
+        'position': {'x': num(start), 'y': cutting.corner(0, train.RAIL_Y)['y']},
         'animationTracks': [{'repeat': 'loop', 'steps': [
-            {'delaySeconds': TRAIN_WAIT, 'durationSeconds': num((end - start) * 2 / train.TRAIN_SPEED, 4),
+            {'delaySeconds': TRAIN_WAIT, 'durationSeconds': num((end - start) / cutting.length(train.TRAIN_SPEED), 4),
              'easeType': 'linear', 'animateProperties': {'x': num(end)}}]}]}}
 
 
@@ -115,7 +115,7 @@ def swinging_from_rest(node, amount, seconds):
 
 
 def hung_at(node, hang):
-    node['overrides']['position'] = {'x': num(hang[0] / 2), 'y': num(hang[1] / 2)}
+    node['overrides']['position'] = cutting.point(*hang)
     return node
 
 
@@ -142,7 +142,7 @@ def lantern_tree_node():
 
 def standing(node_id, tid, foot, scale):
     return {'id': node_id, 'ref': meadow_flowers_template.OUTPUT + '#' + tid, 'overrides': {
-        'position': {'x': num(foot[0] / 2), 'y': num(foot[1] / 2)}, 'xScale': num(scale, 5), 'yScale': num(scale, 5)}}
+        'position': cutting.point(*foot), 'xScale': num(scale, 5), 'yScale': num(scale, 5)}}
 
 
 def foreground():
@@ -185,4 +185,4 @@ def build():
 
 
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)

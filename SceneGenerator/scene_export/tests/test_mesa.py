@@ -67,7 +67,7 @@ def test_the_waterfall_template_repeats_and_scrolls_down_one_period_a_loop():
     track, = fall['animationTracks']
     assert track['repeat'] == 'loop'
     step, = track['steps']
-    assert step['animateProperties'] == {'scrollY': -mesa.FALL_PERIOD / 2}
+    assert step['animateProperties'] == {'scrollY': -cutting.length(mesa.FALL_PERIOD)}
     assert step['easeType'] == 'linear'
 
 

@@ -24,7 +24,7 @@ def test_the_main_menu_shows_the_train_meadow():
 
 def test_the_train_slides_only_across_on_its_rails_its_shape_never_changing():
     crossing = node('crossing train')
-    assert crossing['overrides']['position']['y'] == train.RAIL_Y / 2
+    assert crossing['overrides']['position']['y'] == cutting.corner(0, train.RAIL_Y)['y']
     animated = {p for t in tracks(crossing) for s in t['steps'] for p in s['animateProperties']}
     assert animated == {'x'}
 
@@ -33,15 +33,15 @@ def test_the_train_enters_wholly_off_the_left_and_leaves_wholly_off_the_right():
     crossing = node('crossing train')
     start = crossing['overrides']['position']['x']
     end = tracks(crossing)[0]['steps'][0]['animateProperties']['x']
-    assert start + TrainMeadow.TRAIN_LENGTH / 2 <= 0
-    assert end >= 768
+    assert start + cutting.length(TrainMeadow.TRAIN_LENGTH) <= 0
+    assert end >= 1280
 
 
 def test_the_train_slides_at_the_speed_its_wheels_turn():
     crossing = node('crossing train')
     step = tracks(crossing)[0]['steps'][0]
     distance = step['animateProperties']['x'] - crossing['overrides']['position']['x']
-    assert abs(distance * 2 / step['durationSeconds'] - train.TRAIN_SPEED) < 0.5
+    assert abs(distance / step['durationSeconds'] - cutting.length(train.TRAIN_SPEED)) < 0.5
 
 
 def test_the_lanterns_and_banner_swing():

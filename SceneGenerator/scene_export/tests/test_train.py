@@ -56,7 +56,7 @@ def test_every_drawn_wheel_bottom_is_on_the_rail_line():
 
 def test_every_wheel_in_the_train_template_stands_on_the_rail():
     for ref in wheel_refs():
-        assert ref['overrides']['position']['y'] + radius_of(ref) / 2 == 0, ref['id']
+        assert ref['overrides']['position']['y'] + cutting.length(radius_of(ref)) == pytest.approx(0, abs=0.5), ref['id']
 
 
 def test_wheel_spin_matches_the_rolling_speed():
@@ -70,6 +70,12 @@ def test_wheel_spin_matches_the_rolling_speed():
         assert abs(rolled - train.TRAIN_SPEED) < 0.05, ref['id']
 
 
+def sheet_at(ref):
+    """The sheet point a ref in the train template was placed from, to within its snapping."""
+    o, at = cutting.corner(*train_template.TRAIN_ORIGIN), ref['overrides']['position']
+    return cutting.sheet_point({'x': at['x'] + o['x'], 'y': at['y'] + o['y']})
+
+
 def rod_refs():
     return [n for n in train_children() if n['ref'].endswith('#train-rod')]
 
@@ -78,15 +84,16 @@ def test_a_rod_couples_every_pair_of_driving_wheels():
     rods = rod_refs()
     assert len(rods) == len(train.ROD_PAIRS)
     xs = [r['overrides']['position']['x'] for r in rods]
-    gaps = [round(b - a, 3) for a, b in zip(xs, xs[1:])]
-    assert gaps == [(b[0] - a[0]) / 2 for a, b in zip(train.ROD_PAIRS, train.ROD_PAIRS[1:])]
+    gaps = [b - a for a, b in zip(xs, xs[1:])]
+    assert gaps == pytest.approx([cutting.length(b[0] - a[0]) for a, b in zip(train.ROD_PAIRS, train.ROD_PAIRS[1:])],
+                                 abs=0.5)
 
 
 def test_every_rod_circles_with_its_crank():
     for rod in rod_refs():
         bx, by = train_template.rod_base(rod['id'])
         tracks = {step_key(t): t for t in rod['overrides']['animationTracks']}
-        r = train.CRANK_R / 2
+        r = cutting.length(train.CRANK_R)
         xs = [s['animateProperties']['x'] for s in tracks['x']['steps']]
         ys = [s['animateProperties']['y'] for s in tracks['y']['steps']]
         angles = [(train_template.DRIVE_START_QUARTERS + k) * math.pi / 2 for k in range(1, 5)]
@@ -236,7 +243,7 @@ def test_the_wheels_start_at_different_angles():
 def test_coupled_driving_wheels_share_one_starting_angle():
     for pair in train.ROD_PAIRS:
         drivers = [n for n in wheel_refs() if n['ref'].endswith('#train-drive-wheel')
-                   and round(n['overrides']['position']['x'] * 2 + train_template.TRAIN_ORIGIN[0]) in pair]
+                   and any(abs(sheet_at(n)[0] - x) < 1 for x in pair)]
         assert len(drivers) == len(pair)
         assert len({n['overrides'].get('rotation', 0) for n in drivers}) == 1
 
@@ -245,9 +252,9 @@ def test_the_rod_starts_at_its_wheels_crank_pins():
     for rod, pair in zip(rod_refs(), train.ROD_PAIRS):
         angle = train_template.DRIVE_START_QUARTERS * math.pi / 2
         driver = next(n for n in wheel_refs() if n['ref'].endswith('#train-drive-wheel')
-                      and round(n['overrides']['position']['x'] * 2 + train_template.TRAIN_ORIGIN[0]) == pair[0])
+                      and abs(sheet_at(n)[0] - pair[0]) < 1)
         assert driver['overrides'].get('rotation', 0) == pytest.approx(angle)
-        r = train.CRANK_R / 2
+        r = cutting.length(train.CRANK_R)
         at = rod['overrides']['position']
         base = train_template.rod_base(rod['id'])
         assert at['x'] == pytest.approx(base[0] - r + r * math.cos(angle), abs=0.002)
@@ -265,8 +272,7 @@ def test_the_flag_pivots_at_the_pole():
 
 def test_the_flag_flutters_a_little_at_the_pole():
     flag = next(n for n in train_children() if n['ref'].endswith('#train-flag'))
-    assert flag['overrides']['position'] == {'x': pytest.approx(train.FLAG_HANG[0] / 2 - train_template.TRAIN_ORIGIN[0] / 2),
-                                             'y': pytest.approx(train.FLAG_HANG[1] / 2 - train_template.TRAIN_ORIGIN[1] / 2)}
+    assert sheet_at(flag) == pytest.approx(train.FLAG_HANG, abs=0.6)
     tracks = flag['overrides']['animationTracks']
     assert tracks and all(t['repeat'] in ('yoyo', 'loop') for t in tracks)
     turn = track_of(flag, 'rotation')
@@ -651,9 +657,7 @@ def test_a_gear_is_placed_on_every_hub():
     refs = gear_refs()
     hubs = [(x, y) for tid in train.GEARS for x, y in train.gear_hubs(tid)]
     assert len(refs) == len(hubs) == 1 + len(train.CARRIAGE_LEFTS)
-    ox, oy = train_template.TRAIN_ORIGIN
-    placed = [(r['overrides']['position']['x'] * 2 + ox, r['overrides']['position']['y'] * 2 + oy) for r in refs]
-    assert placed == hubs
+    assert [sheet_at(r) for r in refs] == [pytest.approx(h, abs=0.6) for h in hubs]
 
 
 def test_every_gear_spins_steadily_slower_than_the_wheels():

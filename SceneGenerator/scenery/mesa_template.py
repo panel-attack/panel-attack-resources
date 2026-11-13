@@ -13,9 +13,9 @@ FALL_SECONDS = 0.9               # one period of the water's fall; a far-off fal
 
 
 def falling():
-    """The track scrolling the strip down one period, in scene units (half its pixels), then starting over."""
+    """The track scrolling the strip down one period, in canvas units, then starting over."""
     return [{'repeat': 'loop', 'steps': [{'durationSeconds': FALL_SECONDS, 'easeType': 'linear',
-                                          'animateProperties': {'scrollY': -mesa.FALL_PERIOD / 2}}]}]
+                                          'animateProperties': {'scrollY': -cutting.num(cutting.length(mesa.FALL_PERIOD))}}]}]
 
 
 def build():
@@ -29,4 +29,4 @@ def build():
 
 
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)
