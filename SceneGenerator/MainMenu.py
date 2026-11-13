@@ -6,7 +6,7 @@
 from scene_export import game, layout, wind
 
 OUTPUT = 'MainMenu.json'
-SCENE_NAME = 'DayValley'
+SCENE_NAME = 'TrainMeadow'
 
 
 def build():

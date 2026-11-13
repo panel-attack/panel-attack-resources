@@ -24,7 +24,9 @@ IMAGE_MODULES = ['scenery.sky', 'scenery.clouds', 'scenery.landscape', 'structur
                  'plants.leaves', 'plants.flowers', 'plants.roses', 'plants.stems', 'plants.bushes',
                  'furniture.planters', 'furniture.table_set', 'EsmeTerrace.background', 'EsmeTerrace.floor',
                  'EsmeTerrace.rail', 'EsmeTerrace.shadows', 'scenery.sun', 'scenery.alps', 'scenery.valley',
-                 'plants.broadleaf', 'plants.pines', 'plants.wildflowers', 'structures.windmill', 'structures.airship']
+                 'plants.broadleaf', 'plants.pines', 'plants.wildflowers', 'structures.windmill', 'structures.airship',
+                 'structures.train', 'scenery.mesa', 'scenery.spring_peaks', 'scenery.spring_valley', 'plants.blossom',
+                 'plants.lantern_tree', 'plants.meadow_flowers']
 # each builds the one file below the game's scenes/ its OUTPUT names
 JSON_MODULES = ['scenery.sky_template', 'scenery.clouds_template', 'scenery.landscape_template',
                 'structures.houses_template', 'plants.trees_template', 'plants.leaves_template',
@@ -34,7 +36,9 @@ JSON_MODULES = ['scenery.sky_template', 'scenery.clouds_template', 'scenery.land
                 'scenery.valley_template', 'plants.broadleaf_template', 'plants.pines_template',
                 'plants.wildflowers_template',
                 'structures.windmill_template', 'structures.airship_template', 'DayValley.DayValley',
-                'MainMenu']
+                'structures.train_template', 'scenery.mesa_template', 'scenery.spring_peaks_template',
+                'scenery.spring_valley_template', 'plants.blossom_template', 'plants.lantern_tree_template',
+                'plants.meadow_flowers_template', 'TrainMeadow.TrainMeadow', 'MainMenu']
 
 
 def indexed_svgs(root, index):
