@@ -125,13 +125,13 @@ LOBE_SPREAD = (0.5, 0.8)         # how far, in core radii, a mound's side circle
 NEAR_BUMP = 22
 # A near mound's top follows one of these profiles, dealt as the far bushes' are: the dome, a flat hedge top, a hump
 # to the left or right, or a saddle with a crown SADDLE_AT each way across and the top dipping to SADDLE_DIP of the
-# height between them; and a share TIP_CHANCE of its bumps carries a pointed leafy tip, the TIP stack of
-# (radius, rise above the bump's centre) in bump radii, where it stays within the bush's height.
+# height between them. TIP_CHANCE of its bumps once carried a pointed leafy tip reaching TIP_REACH bump radii above
+# the bump's centre; the tips are gone, but their draws are still made so every bush keeps its shape.
 MOUND_PROFILES = ('dome', 'flat', 'humped left', 'humped right', 'saddle')
 SADDLE_AT = (0.22, 0.78)
 SADDLE_DIP = 0.62
 TIP_CHANCE = 0.3
-TIP = ((0.7, 0.6), (0.5, 1.0), (0.3, 1.35))
+TIP_REACH = 1.75
 BUMP_SIZES = (0.5, 0.62, 0.74, 0.85)
 CROWN_AT = (0.45, 0.6)
 NEAR_DOME = 1.0

@@ -444,8 +444,7 @@ def test_the_bushes_behind_the_track_use_every_profile():
 
 
 # The near bushes' mounds are not all one dome with its crown near the middle: a mound's top follows one of several
-# profiles too, a dome, a flat hedge, a hump to the left or right, a saddle with two crowns, and a few leafy tips
-# stand up pointed out of the bumps.
+# profiles too, a dome, a flat hedge, a hump to the left or right, a saddle with two crowns.
 def mound_tops(profile, w=180, h=70):
     import random
     bumps = spring_valley.mound_bumps(300, 600, w, h, random.Random(profile), profile)
@@ -480,5 +479,8 @@ def test_the_near_bushes_use_every_mound_profile():
     assert set(profiles) == set(spring_valley.ref.MOUND_PROFILES)
 
 
-def test_some_near_bush_bumps_carry_a_pointed_tip(land):
-    assert any(p.get('id', '').startswith('tip') for b in near_bushes(land) for p in b.iter())
+# On the long hedge under the track: the tips sticking out of this moss look out of place. A few bumps carried
+# a pointed leafy tip standing up out of the mound's top; no bump does.
+def test_no_near_bush_has_a_pointed_tip(land):
+    assert near_bushes(land)
+    assert not any(p.get('id', '').startswith('tip') for b in near_bushes(land) for p in b.iter())

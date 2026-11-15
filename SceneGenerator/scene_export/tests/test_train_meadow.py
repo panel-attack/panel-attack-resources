@@ -2,7 +2,7 @@ import MainMenu
 from EsmeTerrace import EsmeTerrace
 from TrainMeadow import TrainMeadow
 from scene_export import cutting, wind
-from scenery import sky, sky_template
+from scenery import mesa, sky, sky_template, spring_valley
 from structures import train
 
 
@@ -117,3 +117,15 @@ def test_every_cloud_drifts_in_the_wind():
 def test_clouds_wait_off_the_left_edge_to_follow_the_ones_in_view():
     xs = [n['overrides']['position']['x'] for n in cloud_nodes(nodes())]
     assert any(x < -200 for x in xs) and any(0 < x < wind.SCENE_SIZE[0] for x in xs)
+
+
+# The spray where the water lands must show. The hills in front of the mesa hide the waterfall's foot, so the
+# spray sits on their line, its foam showing above it and its bottom hidden under it.
+HILLS_IN_FRONT_OF_THE_MESA = ('hills far left', 'hills far centre', 'hills far right', 'hills middle')
+
+
+def test_the_spray_shows_on_the_hill_line_that_hides_the_waterfalls_foot():
+    x, y, w, h = dict(mesa.cut())['mesa-spray'].box
+    line = min(hill.top(x + w / 2) for hill in spring_valley.hills() if hill.name in HILLS_IN_FRONT_OF_THE_MESA
+               and hill.edge[0][0] <= x + w / 2 <= hill.edge[-1][0])
+    assert y + h / 3 < line < y + h

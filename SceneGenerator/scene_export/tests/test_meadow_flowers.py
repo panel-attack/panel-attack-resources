@@ -328,3 +328,59 @@ def lobes(points, k=4):
 def test_a_pink_flowers_centre_has_a_scalloped_rim(sheet, tid):
     centre = next(p for p in paths(sheet[tid]) if p.get('id') == tid + ' head centre')
     assert lobes(list(svgtools._points(centre.get('d')))) >= 3
+
+
+# On the big pink flower in the corner: the petals aren't individually bordered. Each petal was outlined only
+# round its lobe, leaving the seams between overlapping petals unlined; each is outlined all the way round.
+@pytest.mark.parametrize('tid', pink_ids())
+def test_every_pink_petal_is_outlined_all_the_way_round(sheet, tid):
+    by_id = {p.get('id'): p for p in paths(sheet[tid])}
+    outlines = head_paths(sheet[tid], tid, ' outline')
+    assert len(outlines) == 5
+    for p in outlines:
+        assert p.get('d').rstrip().endswith('Z'), p.get('id')
+        edge = list(svgtools._points(by_id[petal_of(p.get('id'))].get('d')))
+        assert list(svgtools._points(p.get('d'))) == edge, p.get('id')
+
+
+def head_part(group, tid, part):
+    return list(svgtools._points(next(p for p in paths(group) if p.get('id') == tid + ' head ' + part).get('d')))
+
+
+def middle_of(points):
+    return sum(x for x, _ in points) / len(points), sum(y for _, y in points) / len(points)
+
+
+# and its centre looked wrong, not centred, maybe rotated wrong: the trumpet stood off up and right of where the petals
+# meet, leaning a fixed way whichever way the head was turned. It grows from where the petals meet.
+@pytest.mark.parametrize('tid', pink_ids())
+def test_a_pink_flowers_trumpet_grows_from_where_its_petals_meet(sheet, tid):
+    centre, radius = stem_top(sheet[tid], tid), meadow_flowers.template_args(tid)[1]
+    foot = middle_of(head_part(sheet[tid], tid, 'throat shadow'))
+    assert math.hypot(foot[0] - centre[0], foot[1] - centre[1]) <= 0.12 * radius, (tid, foot, centre)
+
+
+# and it rises out of the head the way the petals rise, its rim a circle seen as the head is turned: foreshortened
+# along the direction the head is turned toward.
+@pytest.mark.parametrize('tid', pink_ids())
+def test_a_pink_flowers_trumpet_is_turned_with_its_head(sheet, tid):
+    centre = stem_top(sheet[tid], tid)
+    toward = math.radians(meadow_flowers.FACES.get(tid, meadow_flowers.FLAT)[1])
+    n = (math.cos(toward), math.sin(toward))
+    rim = head_part(sheet[tid], tid, 'centre')
+    cup = middle_of(rim)
+    tips = middle_of([farthest_point(head_part(sheet[tid], tid, 'petal %d' % i), centre) for i in range(1, 6)])
+    assert (cup[0] - centre[0]) * (tips[0] - centre[0]) + (cup[1] - centre[1]) * (tips[1] - centre[1]) > 0, tid
+    along = [(x - cup[0]) * n[0] + (y - cup[1]) * n[1] for x, y in rim]
+    across = [(y - cup[1]) * n[0] - (x - cup[0]) * n[1] for x, y in rim]
+    assert max(along) - min(along) < max(across) - min(across), tid
+
+
+def farthest_point(points, centre):
+    return max(points, key=lambda p: math.hypot(p[0] - centre[0], p[1] - centre[1]))
+
+
+# Remove the right pink flower. The big pink flower among the right foreground's flowers is gone; the corner one
+# on the left and the small mid ones stay.
+def test_no_big_pink_flower_stands_in_the_right_foreground():
+    assert not [f for f in reference.FLOWERS if f[0].startswith('flower-pink') and f[1][0] > 768 and f[2] > 40]

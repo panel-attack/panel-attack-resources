@@ -10,8 +10,7 @@
 #   angle so the spokes don't all line up; the driving wheels one rod couples share one angle. The connecting rod
 #   circles with the crank pins from that angle: its x and y tracks are the cosine and sine of the wheel's turn,
 #   made of sine-eased quarter-turn steps. The gear emblems spin about their hubs over their bodies, decoratively
-#   slower than the wheels, their teeth all running at GEAR_TOOTH_SPEED, the cab's one way and the carriages'
-#   alternately.
+#   slower than the wheels, their teeth all running at GEAR_TOOTH_SPEED, all clockwise.
 #
 #   The smoke is a steady stream of puffs rising from the funnel, each growing and fading at a constant rate over
 #   one life, SMOKE_SECONDS. The engine repeats a step's delaySeconds on every loop, so staggering the puffs by a
@@ -89,16 +88,13 @@ def gear_turn_seconds(tid):
 
 
 def gear_refs(images):
-    """One gear image of each size placed on every hub of that size, spinning: the cab's clockwise, the carriages'
-    alternately."""
+    """One gear image of each size placed on every hub of that size, spinning clockwise."""
     out = []
     for (gid, tid), (x, y) in zip(train.gear_groups(), [h for tid in train.GEARS for h in train.gear_hubs(tid)]):
-        k = len(out)
-        way = -1 if k % 2 else 1
-        start = GEAR_STARTS[k % len(GEAR_STARTS)]
+        start = GEAR_STARTS[len(out) % len(GEAR_STARTS)]
         out.append({'id': gid, 'ref': OUTPUT + '#' + tid,
                     'overrides': {'position': cutting.point(x, y), 'rotation': num(start, 6),
-                                  'animationTracks': [spin_track(gear_turn_seconds(tid), start, way)]}})
+                                  'animationTracks': [spin_track(gear_turn_seconds(tid), start)]}})
     return out
 
 

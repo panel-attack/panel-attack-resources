@@ -41,7 +41,6 @@ FLOWERS = [
     ('flower-daisy-near', (1267, 842), 36),
     ('flower-daisy-near', (1190, 865), 36),
     ('flower-daisy-near', (1142, 905), 30),
-    ('flower-pink-near', (1312, 875), 58),
     ('flower-violet-near', (1440, 832), 72),
     ('flower-pink-corner', (150, 800), 112),
 ]

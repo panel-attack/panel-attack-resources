@@ -40,8 +40,12 @@ SILHOUETTE_LINE = 3.0            # px, the outline round each cluster, the Esme 
 # run past the visible band.
 CLUSTERS = [(1476, 104, 46), (1530, 66, 56), (1596, 44, 48),
             (1416, 168, 48), (1496, 136, 62), (1578, 104, 58),
-            (1368, 232, 50), (1440, 218, 60), (1530, 190, 62), (1600, 170, 46),
+            (1368, 232, 50), (1600, 170, 46),
             (1318, 300, 56), (1404, 292, 50), (1498, 262, 54), (1580, 246, 50)]
+
+
+# clusters from the crown's middle rows drawn last, in front of the row below them, so the crown has depth
+CLUSTERS_FRONT = [(1440, 218, 60), (1530, 190, 62)]
 
 
 # the clusters behind the fork, drawn before the trunk so the limbs climb out of foliage: the crown's underside
@@ -258,7 +262,7 @@ def crown_back(svg):
 def crown(svg):
     """The crown over the trunk and limbs."""
     svg.open('lantern tree crown')
-    cloud(svg, clusters_of(CLUSTERS, 'lantern tree'))
+    cloud(svg, clusters_of(CLUSTERS + CLUSTERS_FRONT, 'lantern tree'))
     svg.close()
 
 

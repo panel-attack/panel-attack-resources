@@ -673,6 +673,13 @@ def test_every_gear_spins_steadily_slower_than_the_wheels():
         assert abs(2 * math.pi * r / step['durationSeconds'] - train.GEAR_TOOTH_SPEED) < 0.05, ref['id']
 
 
+# Every gear turns clockwise, a positive rotation on the game's y-down canvas.
+def test_every_gear_spins_clockwise():
+    for ref in gear_refs():
+        step, = ref['overrides']['animationTracks'][0]['steps']
+        assert step['animateProperties']['rotation'] > ref['overrides']['rotation'], ref['id']
+
+
 def test_the_gears_are_drawn_over_the_bodies_under_the_rods():
     root, _ = cutting.load('structures/train.svg')
     order = [g.get('id') for g in cutting.find_group(root, 'train')]

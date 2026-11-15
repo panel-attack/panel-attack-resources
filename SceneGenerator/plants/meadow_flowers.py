@@ -66,7 +66,6 @@ PLUM = '#8a2a5e'                # the pink flower's outline, the dark plum of Tr
                                 # Esme's rule of outlining a shape in its own hue allows
 PINK_LINE = '#c83880'           # its veins and creases, the deeper pink of the source's
 FACET = 0.4                     # the band along a petal's lit edge is this far from its tone toward the light colour
-SEAM = 0.5                      # a pink petal's outline starts this far out along its sides
 VEINS = ((-0.12, 0.58), (0.02, 0.7), (0.14, 0.55))
 HEART = 0.45                    # the pink flower's petals are fused into a tube this share of the radius wide at the
                                 # centre, so no gap between their narrow bases shows the stem behind    # (sideways lean, reach) of each vein, shares of the petal's
@@ -80,6 +79,8 @@ PALETTES = {
     'violet': ('#b476fc', '#c894ff', '#9a60ea', None, None, 'cross'),
     'lilac': ('#cdb0e6', '#e4d0f6', '#a888d0', None, None, 'disc'),
 }
+MOUTH = 0.5                     # its open mouth is this share of the rim's radius
+TRUMPET = 1.0                   # the trumpet stands out of the head this many times its rim's radius
 CUP_OUTLINE = '#cf7c0a'         # the trumpet's yellow cup is rimmed in orange, not the olive of a dark yellow
 CENTRES = {     # fill, shade, shine
     'cup': ('#fcdc25', '#fe9f00', '#fff0a0'),
@@ -246,14 +247,21 @@ def placed(points, centre, angle, face=FLAT):
     """Petal points (u, v), u out along a petal growing at angle from the head's centre, as they show on a head seen
     as face says: the petal rises out of the head's plane, the head turns away from the viewer toward the screen
     direction, and the result is projected flat."""
-    toward, tilt, rise = (math.radians(d) for d in face[1:])
+    tan_r = math.tan(math.radians(face[3]))
+    return lifted([rotate((u, v), angle) + (u * tan_r,) for u, v in points], centre, face)
+
+
+def lifted(points, centre, face):
+    """Points (x, y, h) of a head seen as face says, (x, y) in the head's plane and h out of it toward the viewer, as
+    they show projected flat: the plane foreshortened along the direction the head is turned toward, and a point
+    standing out of it shifted the other way."""
+    toward, tilt = (math.radians(d) for d in face[1:3])
     nx, ny = math.cos(toward), math.sin(toward)
-    cos_t, sin_t, tan_r = math.cos(tilt), math.sin(tilt), math.tan(rise)
+    cos_t, sin_t = math.cos(tilt), math.sin(tilt)
     out = []
-    for u, v in points:
-        x, y = rotate((u, v), angle)
+    for x, y, h in points:
         s, t = x * nx + y * ny, y * nx - x * ny
-        s = s * cos_t - u * tan_r * sin_t
+        s = s * cos_t - h * sin_t
         out.append((centre[0] + s * nx - t * ny, centre[1] + s * ny + t * nx))
     return out
 
@@ -301,8 +309,7 @@ def head(svg, name, palette, centre, radius, shape, face, seed, width):
     """Five petals round the centre, each outlined width wide in a dark shade of its colour, with its shaded band on
     the side away from the light under the outline, the pink flower's lighter band along its edge toward the light
     and its three veins fanning out from the centre; the head seen as face says, the petals on its far side drawn
-    first and the near ones over them. The pink flower's petals lie over each other, so each is outlined only round
-    its lobe, from SEAM of its length out, the seams between them fading toward the centre under the veins."""
+    first and the near ones over them."""
     body, light, shade, outline, vein, kind = PALETTES[palette]
     outline = outline or shade_of(body)
     rnd = random.Random(seed)
@@ -322,13 +329,7 @@ def head(svg, name, palette, centre, radius, shape, face, seed, width):
         pname = '%s petal %d' % (name, i + 1)
         edge = poly(placed(l + t + r, centre, a, face))
         tone = petal_tone(palette, a)
-        if vein:
-            svg.path(edge, tone, name=pname)
-            lobe = [p for p in l if p[0] >= SEAM * length] + t + [p for p in r if p[0] >= SEAM * length]
-            rim = poly(placed(lobe, centre, a, face), close=False)
-        else:
-            svg.path(edge, tone, outline, width, name=pname)
-            rim = edge
+        svg.path(edge, tone, *(() if vein else (outline, width)), name=pname)
         away = 1 if math.sin(LIGHT - a) < 0 else -1      # the side of the petal turned from the light
         if vein:
             svg.path(poly(placed(shade_band(l, t, r, half_width, -away), centre, a, face)), mix(tone, light, FACET),
@@ -339,8 +340,8 @@ def head(svg, name, palette, centre, radius, shape, face, seed, width):
             lines = [poly(placed(vein_shape, centre, a, face)) for vein_shape in
                      (vein_sliver(length, lean, reach, width * 3.0) for lean, reach in VEINS)]
             svg.path(' '.join(lines), vein, name=pname + ' veins')
-        svg.path(rim, 'none', outline, width, name=pname + ' outline')
-    flower_centre(svg, name, kind, centre, radius, width * CENTRE_LINE, squash)
+        svg.path(edge, 'none', outline, width, name=pname + ' outline')
+    flower_centre(svg, name, kind, centre, radius, width * CENTRE_LINE, squash, face)
 
 
 def lobed(c, rr, lobes, squash=SQUASH, turn=0.0, n=60):
@@ -349,34 +350,37 @@ def lobed(c, rr, lobes, squash=SQUASH, turn=0.0, n=60):
             for t in [2 * math.pi * i / n for i in range(n)]]
 
 
-def flower_centre(svg, name, kind, c, radius, width, squash=SQUASH):
+def flower_centre(svg, name, kind, c, radius, width, squash=SQUASH, face=FLAT):
     """The middle of the flower: the pink flower's yellow trumpet, a cup with a scalloped rim on an orange throat
-    tapering down and left of it, a violet's yellow cross, a buttercup's deep orange star round its eye, or a daisy's
-    disc, squashed as the head is turned, each outlined width wide in a dark shade of its own yellow."""
+    growing out of where the petals meet, seen as face says, a violet's yellow cross, a buttercup's deep orange star
+    round its eye, or a daisy's disc, squashed as the head is turned, each outlined width wide in a dark shade of its
+    own yellow."""
     fill, shade, shine = CENTRES[kind]
     rr = radius * (0.18 if kind == 'cup' else 0.3)
     if kind == 'cup':
-        cup, ry = (c[0] + radius * 0.08, c[1] - radius * 0.08), rr * 0.6
-
-        def tilted(pts):        # the trumpet leans down and left, its cup turned up to the right
-            return [(cup[0] + x, cup[1] + y) for x, y in (rotate((px - cup[0], py - cup[1]), -0.4) for px, py in pts)]
-        tip = (cup[0] - rr * 0.1, cup[1] + rr * 1.5)
-        svg.path(poly(tilted(ellipse((tip[0], tip[1] - ry * 0.2), rr * 0.55, ry * 0.5))), mix(shade, '#c02040', 0.5),
-                 name=name + ' throat shadow')
-        throat = ([(cup[0] - rr * 0.9, cup[1]), (cup[0] + rr * 0.9, cup[1])]
-                  + bezier((cup[0] + rr * 0.9, cup[1]), (tip[0] + rr * 0.5, tip[1]), tip, 6)
-                  + bezier(tip, (tip[0] - rr * 0.55, tip[1]), (cup[0] - rr * 0.9, cup[1]), 6))
-        svg.path(poly(tilted(throat)), shade, shade_of(shade), width, name=name + ' throat')
-
-        def bell(t):
-            up = max(0.0, -math.sin(t))
-            return 1 + 0.3 * up ** 0.4 * (1 - math.cos(6 * t)) / 2
-        rim = tilted(lobed(cup, rr, bell, ry / rr, n=80))
-        svg.path(poly(rim), fill, CUP_OUTLINE, width, name=name + ' centre')
+        foot, height = rr * 0.35, rr * TRUMPET
+        cup = lifted([(0, 0, height)], c, face)[0]
+        svg.path(poly(lifted([(foot * 1.4 * math.cos(t), foot * 1.4 * math.sin(t), 0) for t in
+                              (2 * math.pi * i / 16 for i in range(16))], c, face)),
+                 mix(shade, '#c02040', 0.5), name=name + ' throat shadow')
+        # the throat's sides run from the rim's edges across the direction the head is turned to its foot's
+        toward = math.radians(face[1])
+        across = toward + math.pi / 2
+        base = [(foot * math.cos(across + t), foot * math.sin(across + t), 0) for t in
+                (math.pi * i / 8 for i in range(9))]
+        mouth = [(rr * math.cos(across + math.pi + t), rr * math.sin(across + math.pi + t), height) for t in
+                 (math.pi * i / 8 for i in range(9))]
+        svg.path(poly(lifted(base + mouth, c, face)), shade, shade_of(shade), width, name=name + ' throat')
         angles = [2 * math.pi * i / 80 for i in range(80)]
-        body = [p for p, t in zip(rim, angles) if math.cos(t - LIGHT) < -0.3]
+        rim = lifted([(rr * k * math.cos(t), rr * k * math.sin(t), height) for t, k in
+                      ((t, 1 + 0.08 * (1 - math.cos(6 * t))) for t in angles)], c, face)
+        svg.path(poly(rim), fill, CUP_OUTLINE, width, name=name + ' centre')
+        body = [p for p in rim if math.cos(math.atan2(p[1] - cup[1], p[0] - cup[0]) - LIGHT) < -0.3]
         svg.path(poly(body + [(cup[0] + (x - cup[0]) * 0.3, cup[1] + (y - cup[1]) * 0.3) for x, y in body[::-1]]),
                  mix(fill, shade, 0.8), name=name + ' centre shade')
+        # the trumpet's open mouth, deep orange down its throat
+        svg.path(poly(lifted([(rr * MOUTH * math.cos(t), rr * MOUTH * math.sin(t), height) for t in angles[::4]], c,
+                             face)), shade, name=name + ' centre mouth')
     elif kind == 'cross':
         arms = lobed(c, rr * 0.9, lambda t: 0.42 + 0.58 * abs(math.cos(2 * t)) ** 2, 0.95, 0.12)
         svg.path(poly(arms), fill, shade_of(fill), width, name=name + ' centre')

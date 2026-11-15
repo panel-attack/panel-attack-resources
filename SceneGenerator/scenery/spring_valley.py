@@ -395,14 +395,12 @@ def mound_bumps(x, foot, w, h, rng, profile='dome'):
     return out
 
 
-def tip_of(bump, foot, h, rng):
-    """The pointed leafy tip standing out of a bump, a short stack of narrowing circles, or none: TIP_CHANCE of the
-    bumps carry one, and only where it stays within the bush's height."""
-    cx, cy, r = bump
-    if rng.random() >= ref.TIP_CHANCE or cy - r * (ref.TIP[-1][0] + ref.TIP[-1][1] + 0.1) < foot - h:
-        return []
-    lean = rng.uniform(-0.1, 0.1) * r
-    return [(cx + lean * rise, cy - r * rise, r * size) for size, rise in ref.TIP]
+def skip_tip_draws(bumps, foot, h, rng):
+    """Make the random draws that once gave a few bumps a pointed leafy tip, since taken out, so every bush and the
+    grass after it keep the shapes they had."""
+    for (cx, cy, r), _ in bumps:
+        if rng.random() < ref.TIP_CHANCE and cy - r * ref.TIP_REACH >= foot - h:
+            rng.uniform(-0.1, 0.1)
 
 
 def highlit(bumps, leafy_bumps, foot, h):
@@ -429,22 +427,20 @@ def mound(svg, x, foot, w, h, rng, colours, outline, profile='dome', name='bush'
     darker shade of that, round it alone, every bump's leaves and column moved toward the light over it so the lower
     left stays dark, a lit facet on each bump on the sunny side, and a row of leaves along its flat foot filling the
     dips between the bumps so it stands as one mass, standing on a flat dark foot of grass blades over the outline's
-    bottom; a few of the bumps carry a pointed leafy tip standing out of the mound's top."""
+    bottom."""
     body, lit, shade, rim = colours
     bumps = mound_bumps(x, foot, w, h, rng, profile)
     leafy_bumps = [leafy(*bump, rng) for bump, _ in bumps]
-    tips = [tip_of(bump, foot, h, rng) for bump, _ in bumps]
+    skip_tip_draws(bumps, foot, h, rng)
     columns = [column for _, column in bumps]
     base_r = h * ref.MOUND_BASE
     base = [(x - w / 2 + base_r + (w - 2 * base_r) * k / 8, foot - base_r, base_r) for k in range(9)]
-    silhouette = [c for circles in leafy_bumps + tips for c in circles] + columns + base
+    silhouette = [c for circles in leafy_bumps for c in circles] + columns + base
     svg.open(name)
     svg.path(circle_union(silhouette), shade, name='mass')
-    for (bump, column), circles, tip in sorted(zip(bumps, leafy_bumps, tips), key=lambda b: b[0][0][1]):
+    for (bump, column), circles in sorted(zip(bumps, leafy_bumps), key=lambda b: b[0][0][1]):
         svg.path(circle_union(shifted(circles + [column], *ref.MOUND_BODY_INSET)), body, name='lobe')
-        if tip:
-            svg.path(circle_union(shifted(tip, *ref.MOUND_BODY_INSET)), body, name='tip')
-        svg.stroke(circle_union(shifted(circles + tip, *ref.MOUND_BODY_INSET)), shade, outline * ref.CREASE,
+        svg.stroke(circle_union(shifted(circles, *ref.MOUND_BODY_INSET)), shade, outline * ref.CREASE,
                    name='crease')
     for k, ((bump, _), circles) in enumerate(zip(bumps, leafy_bumps)):
         if (k + 0.5) / len(bumps) >= ref.MOUND_LIT_FROM:

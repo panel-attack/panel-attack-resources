@@ -33,9 +33,9 @@ SKY_CLOUDS = [
     ('cloud r4-33', (-12, 56)),
 ]
 SAIL_TURN = 18.0                    # seconds for one turn of the sails, anticlockwise as on a Dutch mill
-AIRSHIP_PATH = ((780, -72), 82)     # (x from, x to) and y in scene units: it crosses right to left high in the sky
+AIRSHIP_PATH = ((1300, -120), 70)   # (x from, x to) and y in canvas units: it crosses right to left high in the sky
 AIRSHIP_CROSSING = (70, 45)         # seconds to cross, seconds out of sight before the next crossing
-AIRSHIP_BOB = (78.4, 4.0)           # (y, seconds) it bobs up to and back
+AIRSHIP_BOB = (64, 4.0)             # (y, seconds) it bobs up to and back
 AIRSHIP_SCALE = (0.216, 0.252)      # it grows slightly as it crosses, coming nearer
 AIRSHIP_ROCK = (0.03, 3.5)          # (radians, seconds) it rocks to and back
 
@@ -170,7 +170,7 @@ def edge_y(points, x):
 
 def standing(node_id, file, tid, foot, scale, mirror=False, lean=0.0):
     """Draws a template anchored at its foot standing on foot, a sheet px point, leaning lean radians about it."""
-    overrides = {'position': {'x': num(foot[0] / 2), 'y': num(foot[1] / 2)},
+    overrides = {'position': cutting.point(*foot),
                  'xScale': num(-scale if mirror else scale, 5), 'yScale': num(scale, 5)}
     if lean:
         overrides['rotation'] = num(lean, 4)
@@ -382,7 +382,7 @@ def drifting_clouds():
         if at is not None:
             part = dataclasses.replace(part, box=at + part.box[2:])
         node = cutting.image_ref(cid, clouds_template.OUTPUT, clouds_template.template_id(cid), part)
-        node['overrides']['animationTracks'] = wind.drift(node['overrides'], part.box[2] / 2, clouds.speed(cid))
+        node['overrides']['animationTracks'] = wind.drift(node['overrides'], cutting.length(part.box[2]), clouds.speed(cid))
         children.append(node)
     return {'id': 'clouds', 'children': children}
 
@@ -414,7 +414,7 @@ def turning_windmill():
     tower = cutting.image_ref('tower', windmill_template.OUTPUT, 'windmill-tower', images['windmill-tower'])
     hub = windmill.HUB
     sails = {'id': 'sails', 'ref': windmill_template.OUTPUT + '#windmill-sails',
-             'overrides': {'position': {'x': num(hub[0] / 2), 'y': num(hub[1] / 2)}, 'animationTracks': [
+             'overrides': {'position': cutting.point(*hub), 'animationTracks': [
                  {'repeat': 'loop', 'steps': [{'durationSeconds': SAIL_TURN, 'easeType': 'linear',
                                                'animateProperties': {'rotation': num(-2 * math.pi, 6)}}]}]}}
     return {'id': 'windmill', 'children': [fence, tower, sails]}
@@ -447,4 +447,4 @@ def build():
 
 
 if __name__ == '__main__':
-    layout.write(OUTPUT, build())
+    layout.write(OUTPUT)

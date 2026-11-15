@@ -1,4 +1,5 @@
 import colorsys
+import math
 import re
 
 import pytest
@@ -6,7 +7,7 @@ import pytest
 from common.painting import hexrgb
 from EsmeTerrace import rail
 from plants import foliage, lantern_tree, lantern_tree_template
-from scene_export import cutting
+from scene_export import cutting, svgtools
 
 
 def hanger_parts():
@@ -146,7 +147,7 @@ def test_each_cluster_of_the_crown_is_outlined_on_its_own():
     the cluster behind it instead of one outline round the whole crown."""
     lantern_tree.main()
     root, _ = cutting.load('plants/lantern_tree.svg')
-    for group, places in (('lantern tree crown', lantern_tree.CLUSTERS), ('lantern tree crown-back', lantern_tree.CLUSTERS_BACK)):
+    for group, places in (('lantern tree crown', lantern_tree.CLUSTERS + lantern_tree.CLUSTERS_FRONT), ('lantern tree crown-back', lantern_tree.CLUSTERS_BACK)):
         ids = [el.get('id') or '' for el in cutting.find_group(root, group).iter()]
         assert sum(i.startswith('cluster outline') for i in ids) == len(places), group
 
@@ -155,3 +156,21 @@ def test_the_crowns_shade_is_a_shade_of_its_own_green():
     """The shade along the clusters' undersides is the Esme leaves' darker green, not a teal rim."""
     assert dark_shade_of(lantern_tree.CLOUD['under'], lantern_tree.CLOUD['body'])
     assert lantern_tree.CLOUD['under'] == foliage.LEAF_SHADE_DEEP['leaf-dark']
+
+
+# Consider bringing some of the middle tree leaf layers to the front. Every row of the crown was drawn over the
+# row above it, so the crown read as one even staircase of clusters; a few clusters from its middle rows are drawn in
+# front of the ones below them.
+def test_some_middle_clusters_of_the_crown_stand_in_front_of_the_row_below():
+    lantern_tree.main()
+    root, _ = cutting.load('plants/lantern_tree.svg')
+    places = lantern_tree.CLUSTERS + lantern_tree.CLUSTERS_FRONT
+    drawn = []
+    for el in cutting.find_group(root, 'lantern tree crown').iter():
+        if (el.get('id') or '').startswith('cluster outline'):
+            x0, y0, x1, y1 = svgtools.path_bbox(el.get('d'))
+            drawn.append(min(places, key=lambda p: (p[0] - (x0 + x1) / 2) ** 2 + (p[1] - (y0 + y1) / 2) ** 2))
+    tops, bottoms = min(p[1] for p in places), max(p[1] for p in places)
+    forward = [p for i, p in enumerate(drawn) if tops < p[1] < bottoms and any(
+        q[1] >= p[1] + 0.6 * p[2] and math.hypot(q[0] - p[0], q[1] - p[1]) < q[2] + p[2] for q in drawn[:i])]
+    assert len(forward) >= 2, forward

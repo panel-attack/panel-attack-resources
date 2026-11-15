@@ -115,3 +115,74 @@ def test_a_rendered_png_carries_its_license(tmp_path, monkeypatch):
     assert tags['Rights'] == ('Copyright, JamBox, 2026. This work is licensed under the Creative Commons Attribution '
                               'ShareAlike 4.0 International License. To view a copy of this license, visit '
                               'https://creativecommons.org/licenses/by-sa/4.0/')
+
+
+# Grey pixels at the borders. Pixelmator writes every transparent pixel as transparent black, and the game draws
+# the 2x PNGs scaled with linear filtering, which blends an edge toward that black: a grey halo round white foam, a
+# dark line under the lip. So every PNG's transparent pixels take the colour of the nearest painted pixel before it is
+# installed; their alpha stays 0.
+def test_transparent_pixels_take_the_colour_of_the_nearest_painted_pixel(tmp_path):
+    from PIL import Image
+    path = str(tmp_path / 'edge.png')
+    im = Image.new('RGBA', (5, 3), (0, 0, 0, 0))
+    im.putpixel((1, 1), (255, 250, 240, 255))
+    im.putpixel((3, 1), (10, 20, 30, 128))
+    im.save(path)
+    export.bleed(path)
+    out = Image.open(path).convert('RGBA')
+    assert out.getpixel((1, 1)) == (255, 250, 240, 255) and out.getpixel((3, 1)) == (10, 20, 30, 128)
+    assert out.getpixel((0, 0)) == (255, 250, 240, 0) and out.getpixel((0, 2)) == (255, 250, 240, 0)
+    assert out.getpixel((4, 0)) == (10, 20, 30, 0) and out.getpixel((4, 2)) == (10, 20, 30, 0)
+    assert all(out.getpixel((x, y))[3] == (255 if (x, y) == (1, 1) else 128 if (x, y) == (3, 1) else 0)
+               for x in range(5) for y in range(3))
+
+
+def test_an_all_transparent_or_all_opaque_image_is_left_as_it_is(tmp_path):
+    from PIL import Image
+    for px in ((0, 0, 0, 0), (9, 8, 7, 255)):
+        path = str(tmp_path / 'flat.png')
+        Image.new('RGBA', (3, 2), px).save(path)
+        export.bleed(path)
+        assert list(Image.open(path).convert('RGBA').getdata()) == [px] * 6
+
+
+def test_a_rendered_png_is_bled_before_it_is_installed(tmp_path, monkeypatch):
+    from PIL import Image
+    part = {'path': 'structures/parts/houses/house-manor', 'svg': 'structures/parts/houses/house-manor.svg',
+            'width': 4, 'height': 2}
+    svgs, game = tmp_path / 'Scenes', tmp_path / 'scenes'
+    (svgs / 'structures/parts/houses').mkdir(parents=True)
+    (svgs / 'structures/parts/houses/house-manor.svg').write_text('<svg/>')
+    monkeypatch.setattr(export, 'SVG_SCENES', str(svgs))
+    monkeypatch.setattr(export, 'RENDERS', str(tmp_path / 'png'))
+    monkeypatch.setattr(export, 'SLOT', str(tmp_path / 'slot.svg'))
+    run = export.subprocess.run
+
+    def fake_osascript(args, **kw):
+        if args[0] != 'osascript':
+            return run(args, **kw)
+        im = Image.new('RGBA', (4, 2), (0, 0, 0, 0))
+        im.putpixel((1, 0), (200, 100, 50, 255))
+        im.save(args[3])
+
+        class Done:
+            returncode, stdout, stderr = 0, 'ok', ''
+        return Done()
+    monkeypatch.setattr(export.subprocess, 'run', fake_osascript)
+    export.export_one(part, 5, store.Store(str(game), state=str(tmp_path / 'gen')))
+    out = Image.open(game / 'structures/parts/houses/house-manor@2x.png').convert('RGBA')
+    assert out.getpixel((3, 1)) == (200, 100, 50, 0) and out.getpixel((1, 0)) == (200, 100, 50, 255)
+
+
+def test_a_nearly_transparent_black_pixel_takes_a_painted_neighbours_colour_too(tmp_path):
+    """Pixelmator loses the colour of a pixel whose alpha rounds to 1 or 2, writing it black: it is recoloured like
+    a transparent one, its alpha kept."""
+    from PIL import Image
+    path = str(tmp_path / 'edge.png')
+    im = Image.new('RGBA', (4, 1), (0, 0, 0, 0))
+    im.putpixel((1, 0), (200, 100, 50, 255))
+    im.putpixel((2, 0), (0, 0, 0, 1))
+    im.save(path)
+    export.bleed(path)
+    out = Image.open(path).convert('RGBA')
+    assert out.getpixel((2, 0)) == (200, 100, 50, 1) and out.getpixel((3, 0)) == (200, 100, 50, 0)

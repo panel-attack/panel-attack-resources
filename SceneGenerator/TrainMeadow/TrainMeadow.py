@@ -173,7 +173,7 @@ def build():
         drifting_clouds(),
         peaks(),
         *land(['hills far']),
-        placed('gear mesa', mesa_template.OUTPUT, mesa.cut()),
+        placed('gear mesa', mesa_template.OUTPUT, mesa_template.placements()),
         *land(['hills far left', 'hills far centre', 'hills far right', 'woods', 'hills middle', 'bushes far', 'track']),
         crossing_train(),
         *land(['bushes']),

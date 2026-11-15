@@ -16,7 +16,9 @@ import shutil
 import subprocess
 import sys
 
+import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 from . import BUILD, GENERATOR, INDEX, RENDERED, STAGING, SVG_SCENES, store
 
@@ -74,6 +76,24 @@ def check_png(path, w, h):
     return None
 
 
+FAINT = 2                        # alpha at or under which Pixelmator writes a pixel's colour as black
+
+
+def bleed(path):
+    """Gives every transparent pixel the colour of the nearest painted one, its alpha staying as it is. Pixelmator
+    writes transparent pixels black, and those whose alpha rounds to 1 or 2 too, and the game samples the 2x PNGs
+    with linear filtering and blends with straight alpha, so an edge texel blended half with transparent black drew
+    a grey fringe round every light shape: a halo round the foam, a dark line under the lip."""
+    im = Image.open(path).convert('RGBA')
+    px = np.array(im)
+    faint = px[..., 3] <= FAINT
+    if not faint.any() or faint.all():
+        return
+    ys, xs = ndimage.distance_transform_edt(faint, return_distances=False, return_indices=True)
+    px[..., :3] = px[ys, xs, :3]
+    Image.fromarray(px, 'RGBA').save(path)
+
+
 def licensed(path):
     """Writes the art's license into the PNG's XMP; returns why it couldn't, or None."""
     r = subprocess.run(['exiftool', '-q', '-overwrite_original'] + ['-%s=%s' % kv for kv in LICENSE_TAGS.items()]
@@ -109,7 +129,10 @@ def export_one(part, timeout, st):
     if failure:
         cleared = alerts('dismiss')
         raise Stop('%s: %s\nPixelmator alerts: %s' % (part['path'], failure, cleared))
-    problem = check_png(out, w, h) or licensed(out)
+    problem = check_png(out, w, h)
+    if not problem:
+        bleed(out)
+        problem = licensed(out)
     if problem:
         raise Stop('%s: %s' % (part['path'], problem))
     if same_pixels(out, dest) and not st.protected(dest):

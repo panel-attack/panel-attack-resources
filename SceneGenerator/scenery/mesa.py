@@ -11,8 +11,9 @@
 #   It stands far off on the left of the sheet, in front of the mountains, so its colours are the reference's hazy
 #   ones: the cliffs a pale mauve where the sun reaches them and a lilac blue in shade, both hazing toward the hills'
 #   blue at the foot, and no line along the land's edges, as the terrace's far hills have none. Each cliff face is
-#   fluted: vertical columns of uneven widths, lighter facets catching the light and deep gaps between them, a
-#   fainter lower tier of columns part way down. Every outline it does have, the ring's, the ledge's and the trees', is the
+#   the reference's two tiers: under the cap, slabs of uneven widths that narrow to points at uneven heights, each
+#   with a lit plane down its left, a shaded one down its right and a dark crack beside it; below them, rounded rock
+#   heaped against the foot, big ones standing high at the back and smaller ones in front. Every outline it does have, the ring's, the ledge's and the trees', is the
 #   Esme terrace's: a dark shade of its own shape's colour (scenery/spring_valley.py's edge_of), as thin as the
 #   terrace's at that distance, never a navy ink. The trees are the terrace's own kinds: its flame-shaped cypresses
 #   (plants/trees.py) hazed as its far shore's are, among round crowns, standing in loose clumps clear of the falls,
@@ -21,13 +22,12 @@
 #   stands in its shadow, the cleft the water runs down is the deepest shade, the ledge's rock is lit along its top
 #   right and the ring's upper-right rim catches the light.
 #
-#   The waterfall is drawn as a strip one FALL_PERIOD tall whose streaks repeat every period (each is clipped to
+#   The waterfall is drawn as a strip one FALL_PERIOD tall of streaks that repeat every period (each is clipped to
 #   the strip at its place and a period above and below it), so the strip tiles top to bottom and the scene can
-#   scroll it with wrap: repeat to make the water fall. The mist is its own image, drawn over the strip's foot, and
-#   the falls frame another, drawn over the strip: the gully's shaded wall covering the strip's left side above a
-#   line leaning out down the drop, so as in the reference the water pours from a lip nearly as wide as the sheet
-#   below, its right edge dropping straight and its left edge leaning out, and the water rounding smoothly over the
-#   lip under a white crest.
+#   scroll it with wrap: repeat to make the water fall. Under it is the water's shape, its body drawn in the falls'
+#   outline, and the scene masks the strip to that shape (stencil), so as in the reference the water pours from a
+#   lip nearly as wide as the sheet below, its right edge dropping straight and its left edge leaning out. Over both
+#   is the lip, the water rounding smoothly over it under a white crest, and the mist where the water lands.
 
 import math
 import os
@@ -45,38 +45,55 @@ LINE = TOWN_LINE_WIDTH           # px, the ring's outline, the terrace's for a b
 DETAIL_LINE = 0.9                # px, seams and inner edges
 
 # ---------------------------------------------------------------- the land
-LEFT, RIGHT = 262, 544           # sheet px, the cliffs' outer edges at their foot
+LEFT, RIGHT = 240, 566           # sheet px, the cliffs' outer edges at their foot
 FOOT = 452                       # sheet px, where the land is cut off, hidden under the hills
 SPLIT = 408                      # sheet px, where the lower top on the left ends at the riser up to the upper top
 BANK_RUN = 5                     # px the riser between the two tops runs for: a sheer step of rock, not a bank
-LOWER_LIP, UPPER_LIP = 352, 340  # sheet px, each top's front edge at its ends; the tops dome up between
+LOWER_LIP, UPPER_LIP = 340, 328  # sheet px, each top's front edge at its ends; the tops dome up between
 LOWER_TILT = 5                   # px the lower top's lip drops toward its left end
-SHELF = (7, 2)                   # px of each flat top seen above its lip at the top's ends, and the extra toward its middle
-BATTER = 8                       # px each cliff's foot stands out past its lip corner: a wall leaning back a little
+SHELF = (9, 3)                   # px of each flat top seen above its lip at the top's ends, and the extra toward its middle
+BATTER = 30                      # px each cliff's foot stands out past its lip corner, sloping out more the lower it is
 SHELF_FADE = 0.3                 # how far the cap shades from its mid green toward the shade at its back edge
-GRASS = {'crest': '#eef49c', 'mid': '#c2dc86', 'shade': '#96c07a'}   # the caps' turf, the reference's yellow-green
+GRASS = {'crest': '#e2e89c', 'mid': '#c6d688', 'shade': '#8fb49c'}   # the caps' turf, the reference's yellow-green
 # the cliffs' rock: the face in the sun, its brightest lit edge and the warm slab beside the cleft; the shade the
 # lower block stands in and the recesses between the columns; the hills' blue every face hazes to at the foot
 CLIFF = {'lit': '#e8d8dc', 'face': '#d2c4ce', 'warm': '#dcc6c2', 'facet': '#bcb0cc', 'shade': '#6690d2', 'recess': '#6c8fd0',
          'deep': '#5878be', 'foot': '#6a92d4'}
-# the columns in the sun and in the shadow, two tones by turns, and the deep gap between one column and the next:
-# (colour, opacity) over the face
-FLUTES = {'lit': (('#ecdee2', 0.65), ('#c6bad0', 0.35)), 'shade': (('#92aadc', 0.5), ('#6a88cc', 0.4))}
-GAPS = {'lit': ('#5e84c8', 0.75), 'shade': ('#4670b8', 0.75)}
-LIT_SLAB = (30, 22)              # px wide the sunlit slab of the lower block beside the cleft is, at the lip and at the foot
+# the slabs in the sun and in the shadow: each slab takes one of its light's tones, its lit left edge the facet tone
+SLABS = {'lit': ('#d8c2cc', '#cbbccc', '#c2b8d0', '#d6bec4'), 'shade': ('#6d92da', '#6489d6', '#7799dc', '#698ed8')}
+FACET_TONE = {'lit': '#eadbe0', 'shade': '#93aee6'}
+BOULDERS = {'lit': ('#c4b8d0', '#cfc0cb', '#b6b2d4'), 'shade': ('#7a97da', '#6f8ed6', '#86a2dc')}
+FOOT_HAZE = (0.5, 30, 50)       # how far each face's colour goes toward the foot's blue, px below the lip it starts, px above the foot it is there
+HIDDEN = 44                      # px above the cut-off foot the hills in front hide the cliff from, about
+UNDERCUT = 4                     # px, the dark band under the cap where the turf overhangs the rock
+DRIPS = (2, 5)                   # px the turf hangs over the lip in tongues, least and most
+SLAB_WIDTH = (16, 38)            # px, a broad slab's width under the cap, least and most
+SLIVER_WIDTH = (6, 11)           # px, a narrow sliver of rock's width between the broad slabs, least and most
+SLIVERS = 0.3                    # share of the slabs that are slivers
+SET_BACK = 0.3                   # share of the slabs set back in shade between those standing out, never two together
+SET_BACK_SHADE = 0.35            # how far a set-back slab's tone goes toward the deep shade
+SET_BACK_REACH = (0.3, 0.65)     # how far down the face a set-back slab's point reaches, least and most
+TIPS = ('point', 'point', 'slant', 'blunt')   # how a slab's foot ends: to a point, cut aslant to one side, or blunt
+LIT_PLANES = 0.7                 # share of the slabs with a lit plane down their left
+SHADE_PLANES = 0.6               # share with a shaded plane down their right
+CRACKS = 0.6                     # share with a dark crack down their left side
+SLAB_REACH = (0.4, 0.95)         # how far down the face above the hidden foot a slab's point reaches, least and most
+SLAB_POINT = (0.8, 1.4)          # px each side of a slab draws in over toward its point, as a share of its width
+POINT_LEAST = 14                 # px, the width a narrow slab draws in over as if it were, so a sliver still tapers
+SLAB_LEAN = 2                    # px a slab's point may stand off its top's middle either way
+WOBBLE = 0.6                     # px a slab's sides waver, so they are not ruled
+CRACK = (1.2, 2.2)               # px wide the dark crack down a slab's left side is under the cap, narrowing down
+CRACK_REACH = (0.5, 0.85)        # how far down the slab's side its crack runs
+LIT_PLANE = (0.15, 0.6)          # share of a slab's width its lit left plane takes under the cap, narrowing to the point
+SHADE_PLANE = (0.12, 0.35)       # share of its width its shaded right plane takes, narrowing to the point
+PLANE_TONE = {'lit': '#a9a8d2', 'shade': '#5f84cc'}
+BOULDER_ROWS = [((22, 46), (30, 60)), ((14, 32), (6, 24))]   # each row of rock heaped at the foot, back to front:
+                                 # (px wide least and most, px its top stands above where the hills hide the foot)
+BOULDER_DOME = (0.3, 0.55)       # a rock's rounded top's height, as a share of its width, least and most
+BOULDER_PEAK = 0.18              # share of its width a rock's crown may stand off its middle either way
+BOULDER_FLARE = 0.1              # share of its width a rock's sides spread out by toward the foot
+LIT_SLAB = (30, 22)              # px wide the sunlit slabs of the lower block beside the cleft are, at the lip and at the foot
 CLEFT_SHADE = (34, 24)           # px past the riser the upper block's shaded left face reaches, at the lip and at the foot
-FOOT_HAZE = (0.85, 30, 10)       # how far each face's colour goes toward the foot's blue, px below the lip it starts, px above the foot it is there
-UNDERCUT = 5                     # px, the dark band under the cap where the turf overhangs the rock
-DRIPS = (2, 8)                   # px the turf hangs over the lip in tongues, least and most
-FLUTE_TOP = (6, 14)              # px under the lip a column's rounded top starts, least and most, so the tops are uneven
-TIER = 0.55                      # share of the drop below the lip the lower tier of columns starts at
-TIER_WIDTH = (3, 7)              # px, a lower-tier column's width, least and most: narrower, being shorter
-TIER_FADE = 0.6                  # how strong the lower tier is against the row above it
-FLUTE_WIDTH = (5, 20)            # px, a column's width, least and most
-FLUTE_GAP = (1, 2.5)             # px between one column and the next, the deep gap
-FLUTE_LEAN = 4                   # px a column's foot may be offset from its top either way, so the columns are not ruled
-FLUTE_TAPER = 3                  # px a column may narrow or widen by toward its foot
-LIT_EDGE = 9                     # px wide the lit band down the upper block's right edge is
 HOLLOW = 3                       # px of shaded rock either side of the cleft the water runs down
 SEED = 'mesa'
 
@@ -89,17 +106,21 @@ ROCK = {'body': CLIFF['facet'], 'lit': CLIFF['lit'], 'shade': CLIFF['shade'], 'd
 TONGUES = 3                      # px the turf drapes over the ledge in lobes
 POUR_CURL = 7                    # px past the strip's top the lip of water rounds off over it
 ROLL_RADIUS = 0.35               # the roll's left shoulder's radius, as a share of the falls' width at the lip
+ROLL_RIGHT = 3                   # px, the radius its right shoulder turns down against the rock with
+BANKS = ((332, 327), (433, 316))  # sheet px, where the banks the land falls away in either side of the water reach back
+                                  # to, as drawn in the markup
+BANK_CURVE = 1.35                 # how steep the banks are by the water against how flat they are going back
 
 # ---------------------------------------------------------------- the gear ring
-GEAR_TOP = 244                   # sheet px, the topmost tooth's tip
-GEAR_CENTRE = (430, 318)
-GEAR_OUTER, GEAR_INNER = 66, 46  # px, the ring face's radii
-TEETH, TOOTH_HEIGHT = 12, 8
-TOOTH_BASE, TOOTH_TIP = 12, 9    # px, half a tooth's width at its base and its tip
+GEAR_TOP = 237                   # sheet px, the topmost tooth's tip
+GEAR_CENTRE = (440, 304)
+GEAR_OUTER, GEAR_INNER = 60, 41  # px, the ring face's radii
+TEETH, TOOTH_HEIGHT = 12, 7
+TOOTH_BASE, TOOTH_TIP = 11, 8    # px, half a tooth's width at its base and its tip
 BORE_SHIFT = (4, -3)             # px the far side of the hole's bore is offset: the ring seen from a little left and below
 BEVEL = 4                        # px, the bevelled ring round the hole
 RIVETS = 8                       # round the rim
-STONE = {'lit': '#f3e2c4', 'body': '#cdb4ae', 'shade': '#8d8cb4', 'deep': '#6f7fb5', 'bore': '#8d86a6'}
+STONE = {'lit': '#e8d3c3', 'body': '#c0a8ac', 'shade': '#9a9cc2', 'deep': '#7c84b6', 'bore': '#8d86a6'}
 LIT_ARC = (-150, 30)             # degrees on screen (y down) of the rim the sun catches
 SHADE_ARC = (105, 200)           # the lower left falls into blue shade
 
@@ -129,25 +150,66 @@ TREES = [round_tree(284, 18, 12), cypress(294, 6.5, 32), round_tree(306, 22, 15,
          round_tree(490, 16, 11), cypress(500, 6.5, 32), round_tree(513, 24, 16, trunk=4), round_tree(523, 15, 10)]
 
 # ---------------------------------------------------------------- the waterfall
-FALL_X = (343, 383)              # sheet px, the strip's edges; the frame narrows the water at the lip
-FALL_TOP = 356                   # sheet px, the strip's top, in the notch under the lower step's lip
-FALL_PERIOD = 96                 # px, the strip's height: its streaks repeat every period
-FALL_COPIES = (-1, 1)            # each streak is drawn at its place and from a period above to one below, so the strip tiles
+FALL_X = (350, 378)              # sheet px, the strip's edges; a narrow sheet, three times as tall as wide where it shows
+FALL_PERIOD = 96                 # px, the back strip's height, 80 canvas units: its bands repeat every period
+FRONT_PERIOD = 126               # px, the front strip's, 105 units, 3.5 s at its speed: the two strips drift past each other
+FALL_COPIES = (-1, 1)            # each band is drawn at its place and from a period above to one below, so the strip tiles
 NOTCH = 6                        # px the lip dips where the water pours out
-LEAN = 4                         # px the falls' left edge leans out over the strip's height, from the lip to its foot
+LEAN = 3                         # px the falls' left edge leans out over the strip's height, from the lip to its foot
 WAVER = (0.8, 2)                 # (px, waves) the left edge wavers about its lean down the strip, still at its ends
-LIP = (2, 5, 2)                  # (px the lip's left end sits under the turf, px its right end stands higher, px it bows up)
-CREST = 4.0                      # px, the white crest along the lip
-WATER = {'body': '#bfe6f8', 'edge': '#e2f4fc', 'streak': '#ffffff', 'shadow': '#4f8fd2', 'shadow streak': '#8cc0ea'}
-SHADOW_SIDE = 0.25               # share of the strip's width the sheet's deep blue shadow side takes, near its right
+LIP = (2, 2, 1.5)                # (px the lip's left end sits under the turf, px its right end stands higher, px it bows up)
+CREST = 2.5                      # px, the white crest along the lip and round its shoulder
+CREST_GLOW = (2.5, 0.4)          # px the crest blends on below itself, and that band's opacity
+POUR_SHADE = 0.35                # opacity of the lip's darker right side
+# faint light streaks over the roll, as painted in the markup, each tapering to a point well above the lip's foot so
+# they make no comb along it: (share of the way across, px wide at the crest, px its point leans right, px long)
+POUR_STREAKS = [(0.16, 0.9, -1.5, 4), (0.3, 0.8, 1.2, 3), (0.44, 1, -1.8, 4.5), (0.6, 0.8, -1.8, 3.5), (0.7, 0.9, -1.5, 4),
+                (0.8, 0.8, 1, 3), (0.9, 0.8, -1.4, 3.5)]
+STREAK_CLEAR = 2                 # px above the lip's foot the longest streak's point stops
+POUR_STREAK = 0.25               # their opacity
+WATER = {'pour': '#c6f1fc', 'body': '#46d2f4', 'edge': '#7fe2f8', 'streak': '#ffffff', 'shadow': '#2cb6e8', 'left edge': '#30bce8',
+         'band': '#93ecfb', 'band light': '#c4f4fd', 'band core': '#e2fbfe'}   # bright cyan, as in the reference
+LEFT_EDGE = 1.2                  # px of light blue down the sheet's left edge, where it turns away from the light
+SHADOW_SIDE = 0.18               # share of the strip's width the sheet's deep blue shadow side takes, near its right
 PALE_EDGE = 1.5                  # px of pale water along the sheet's right edge, outside its shadow side
-VEIL = (24, (0.5, 0.38, 0.26, 0.15, 0.06))   # (px down from the lip, white's opacity each step) of the white fading down
-STREAKS = 16                     # bright and shaded streaks down the strip
-SPRAY = {'body': '#eef6fd', 'shade': '#d8eaf7', 'mist': '#e9f3fc'}
-SPRAY_CENTRE = (364, 448)
-SPRAY_PUFFS = [(-30, 4, 7), (-18, 0, 9), (-6, -3, 10), (6, -3, 10), (18, 0, 9), (30, 4, 7), (-40, 7, 5), (40, 7, 5),
-               (-12, 2, 8), (10, 2, 8)]     # (dx, dy, r) round SPRAY_CENTRE: one low mass of foam
-SPRAY_STREAKS = [(-14, -22, 3, 12), (8, -26, 3, 14), (-2, -14, 2.5, 8)]   # (dx, dy, w, h) loose water thrown up from it
+SHADOW_FADE = 12                 # px below the lip's foot the shadow side deepens over, from the lip's shade to its own
+FOOT_PALE = 0.3                  # how far the body pales toward white at the foam, the water going to foam as it falls
+# the two strips of zigzag bands, the back one slow and soft, the front one faster, white and sharper. Each: its period,
+# canvas units it falls a frame (a whole number of 2x texture px, or it judders), where in the period each band's top
+# is (shares, uneven), px thick, px its teeth hang below it and its notches rise above it, a tooth's width (average
+# px, least and most share of that), the share of the way across each band spans (a band short of an edge tapers out),
+# and its layers outer to inner: (colour, opacity, px below the band's top, share of its thickness, share of its hang)
+STRIPS = {
+    'back': {'period': FALL_PERIOD, 'speed': 0.25, 'at': (0.04, 0.4, 0.66), 'thick': 5.5, 'hang': (2, 6), 'notch': (1, 3),
+             'tooth': (6.5, 0.6, 1.5), 'spans': [(0, 1), (0, 1), (0, 1)],
+             'layers': [('band', 0.5, 0, 1, 1), ('band light', 0.6, 1, 0.6, 0.6)]},
+    'front': {'period': FRONT_PERIOD, 'speed': 0.5, 'at': (0.04, 0.34, 0.5, 0.76), 'thick': 3, 'hang': (4, 12),
+              'notch': (1, 4), 'tooth': (5, 0.5, 1.6), 'spans': [(0, 1), (0.3, 1), (0, 0.72), (0.15, 0.85)],
+              'layers': [('band light', 0.55, 0, 1, 1), ('band core', 0.9, 0.6, 0.5, 0.55)]},
+}
+BAND_TILT = 0.06                 # px a band's top may rise or drop a px across, so the bands are not ruled
+TAPER = 7                        # px a band short of an edge thins out over, to nothing at its end
+LIP_ABOVE = 12                   # px above the strip's top the lip's box starts: a whole number of canvas units (6 px = 5)
+LIP_SIDE = 6                     # px left of the strip the lip's box starts, likewise, and px of room right of it
+SPRAY = {'body': '#f4fcff', 'shade': '#b9ecf9', 'mist': '#eefaff'}
+SPRAY_CENTRE = (364, 408)       # just below where the far hills in front hide the falls' foot, so the foam covers the foot
+SPRAY_BOX = (30, 18, 60, 30)     # px left and above the centre the spray's parts' box starts, its width and height
+# (dx, dy, r) round SPRAY_CENTRE: the still, solid foam the falls end in, a low mound little wider than the falls
+FOAM_BED = [(-17, 3, 3.2), (-12, 1.5, 4), (-6, 0.5, 4.6), (0, 0, 4.8), (6, 0.5, 4.6), (12, 1.5, 4), (17, 3, 3.2)]
+FOAM_SHADE = (1.5, 0.4)          # px the bed's shade sits below it, and its opacity
+MIST = (0, -3, 15, 4)            # (dx, dy, rx, ry) round the centre: the mist breathing over the foam
+MIST_OPACITY = 0.35
+CHURN_PERIOD = 24                # px, the churn strip's width, 20 canvas units: its dimples repeat every period
+CHURN_ABOVE = 12                 # px above the spray's centre the churn strip starts (a whole number of units from the box)
+CHURN_HEIGHT = 16                # px, the churn strip's height
+# the dimples rolling out over the foam, (dx, dy, rx, ry, opacity) in the churn's period from its left and the centre's
+# height: hollows of the foam's shade, big and small, none in a row
+DIMPLES = [(3, 2, 3, 1.6, 0.45), (9.5, 5.2, 2.2, 1.2, 0.4), (14, 1.2, 3.4, 1.8, 0.45), (20, 4, 2.6, 1.4, 0.42),
+           (6.5, 7, 1, 0.6, 0.5), (17.5, 6.6, 0.9, 0.55, 0.5), (23, 0.5, 1.1, 0.7, 0.4)]
+RISING = [[(-4, -2, 2.4), (3, -1.5, 2)], [(2, -2.5, 2.2), (-7, -0.5, 1.9)]]   # two sets of foam heaving out of it in turn, (dx, dy, r)
+# the loose water thrown up from it, two sets the scene throws up in turn: [(dx, dy, w, h) streaks], [(dx, dy, r) drops]
+THROWN = [([(-6, -7, 1.2, 4), (1, -6, 1.1, 3.5)], [(-15, -1, 0.9), (14, -2, 0.9), (-18, 2, 0.7)]),
+          ([(5, -8, 1.2, 4.5), (-3, -6, 1, 3.5)], [(-12, -3, 0.8), (12, -3, 0.7), (18, 2, 0.8)])]
 
 
 def circle(cx, cy, r):
@@ -162,9 +224,10 @@ def hole(cx, cy, r):
 
 
 def edge_x(x_foot, y, lean):
-    """An outer cliff's x at height y: x_foot at FOOT, leaning back by BATTER at the lip."""
-    t = (FOOT - y) / (FOOT - UPPER_LIP)
-    return x_foot + lean * BATTER * t
+    """An outer cliff's x at height y: x_foot at FOOT, BATTER px in at the lip, steep under the lip and spreading
+    out toward the foot."""
+    s = (y - UPPER_LIP) / (FOOT - UPPER_LIP)
+    return x_foot + lean * BATTER * (1 - s * s)
 
 
 LIP_LEFT = edge_x(LEFT, LOWER_LIP + LOWER_TILT, 1)     # sheet px, the lower top's left corner
@@ -222,8 +285,48 @@ def wall(x_foot, lean, n=8):
 
 
 def top_edge(n=64):
-    """The top edge from the left lip corner to the right one, along both tops and the riser between."""
-    return [(LIP_LEFT + (LIP_RIGHT - LIP_LEFT) * k / n, top_y(LIP_LEFT + (LIP_RIGHT - LIP_LEFT) * k / n)) for k in range(n + 1)]
+    """The top edge from the left lip corner to the right one, along both tops and the riser between, down into the
+    gap the water pours out of."""
+    return [(x, land_top_y(x)) for x in with_gap([LIP_LEFT + (LIP_RIGHT - LIP_LEFT) * k / n for k in range(n + 1)])]
+
+
+def gap():
+    """(x0, x1) of the gap in the land the water pours out of, as in the reference: from where the roll's left
+    shoulder comes up to the lip to its right edge, with no turf or rock above the water between."""
+    shoulder, _ = pour_outline()
+    return shoulder[1][0], FALL_X[1]
+
+
+def valley_y(x):
+    """The highest the land may stand at x: just under the roll's top over the water, then up each bank, steep by the
+    water and flattening as it reaches back; no limit beyond the banks."""
+    x0, x1 = gap()
+    (xl, yl), (xr, yr) = BANKS
+    if x0 <= x <= x1:
+        return roll_top_y(x) + 1
+    near, far, y_far = (x0, xl, yl) if x < x0 else (x1, xr, yr)
+    t = (x - near) / (far - near)
+    if t >= 1:
+        return -math.inf
+    y_near = roll_top_y(near) + 1
+    return y_near - (y_near - y_far) * (1 - (1 - t) ** BANK_CURVE)
+
+
+def land_top_y(x):
+    """The land's top at x: the tops, cut down to the valley the water pours out of."""
+    return max(top_y(x), valley_y(x))
+
+
+def lowered(x, y):
+    return max(y, valley_y(x))
+
+
+def with_gap(xs):
+    """xs with points along the banks added, and the gap's edges, so what follows the land's top runs down the banks."""
+    (xl, _), (xr, _) = BANKS
+    lo, hi = min(xs), max(xs)
+    banks = [xl + (xr - xl) * k / 120 for k in range(121)] + list(gap())
+    return sorted({x for x in xs} | {x for x in banks if lo < x < hi})
 
 
 def outline():
@@ -271,63 +374,158 @@ def shaded_at(x):
     return x < slab_edge_x(y) or FALL_X[1] < x < cleft_shade_x(y)
 
 
-def flute(x0, x1, top_of, lean, taper):
-    """A column's polygon: a rounded top at top_of(x), x0 to x1 wide, down to the foot with its foot offset by lean and
-    taper px wider each side, or narrower."""
-    r = (x1 - x0) / 2
-    cx = (x0 + x1) / 2
-    top = [(x, top_of(x) + dy) for x, dy in ((x0, r * 0.45), (x0 + r * 0.3, r * 0.12), (cx, 0), (x1 - r * 0.3, r * 0.12), (x1, r * 0.45))]
-    return poly(top + [(x1 + lean + taper, FOOT), (x0 + lean - taper, FOOT)])
+def visible_foot(x):
+    """sheet px, about where the hills in front hide the cliff at x."""
+    return FOOT - HIDDEN
 
 
-def column_row(svg, step, rng, top_of, widths=FLUTE_WIDTH, fade=1.0):
-    """A row of columns across a block's face, their tops at top_of(x) shifted unevenly, side by side with a deep gap
-    between each and the next, of uneven widths, leans and tapers, lighter and darker by turns, none where the water
-    runs down, widths px wide; those in shade are the blue-lilac, the rest the sunlit pink, all fainter by fade."""
+def wobbly(p0, p1, rng, n=5):
+    """The points from p0 to p1 along a side wavering a little either way, its ends where they are."""
+    return [(p0[0] + (p1[0] - p0[0]) * k / n + (rng.uniform(-WOBBLE, WOBBLE) if 0 < k < n else 0),
+             p0[1] + (p1[1] - p0[1]) * k / n) for k in range(n + 1)]
+
+
+def slab_tip(x, w, top, reach, rng):
+    """Where a slab's sides end and its foot: (left side's end, the foot's points, right side's end)."""
+    tip_y = top + (visible_foot(x) - top) * reach
+    run = max(w, POINT_LEAST)
+    kind = rng.choice(TIPS)
+    if kind == 'slant':
+        low_left = rng.random() < 0.5
+        foot = [(x + w * (0.1 if low_left else 0.9), tip_y)]
+        drop = run * rng.uniform(1.0, 1.6)
+        return (x, tip_y - (run * 0.2 if low_left else drop)), foot, (x + w, tip_y - (drop if low_left else run * 0.2))
+    if kind == 'blunt':
+        mid = x + w * rng.uniform(0.4, 0.6)
+        foot = [(mid - w * 0.07, tip_y), (mid + w * 0.07, tip_y - rng.uniform(0, 2))]
+    else:
+        foot = [(x + w * rng.uniform(0.35, 0.65) + rng.uniform(-SLAB_LEAN, SLAB_LEAN), tip_y)]
+    return (x, tip_y - run * rng.uniform(*SLAB_POINT)), foot, (x + w, tip_y - run * rng.uniform(*SLAB_POINT))
+
+
+def slab(svg, x, w, light, tone, set_back, rng):
+    """One slab under the cap in the tone given: its sides running down from the cap and drawing in to its foot. One
+    standing out may have a lit plane down its left, a shaded one down its right and a dark crack beside it; one set
+    back is darker, ends higher and has none."""
+    top_of = lambda xx: lowered(xx, cap_front_y(xx) + 1)
+    top = max(top_of(x), top_of(x + w))
+    left, foot, right = slab_tip(x, w, top, rng.uniform(*(SET_BACK_REACH if set_back else SLAB_REACH)), rng)
+    under = [(x + w * k / 6, top_of(x + w * k / 6)) for k in range(7)]
+    outline = under + wobbly((x + w, top_of(x + w)), right, rng)[1:] + foot[::-1] + wobbly(left, (x, top_of(x)), rng)[:-1]
+    if set_back:
+        svg.path(poly(outline), hazed(mix(tone, CLIFF['deep'], SET_BACK_SHADE)), name='recess')
+        return
+    svg.path(poly(outline), hazed(tone), name='slab')
+    if rng.random() < LIT_PLANES:
+        lit = w * rng.uniform(*LIT_PLANE)
+        svg.path(poly([(x, top_of(x)), (x + lit, top_of(x + lit)), foot[0], left]), hazed(FACET_TONE[light]),
+                 name='lit plane', extra=' fill-opacity="0.7"')
+    if rng.random() < SHADE_PLANES:
+        shade = w * rng.uniform(*SHADE_PLANE)
+        svg.path(poly([(x + w - shade, top_of(x + w - shade)), (x + w, top_of(x + w)), right, foot[-1]]),
+                 hazed(PLANE_TONE[light]), name='shade plane', extra=' fill-opacity="0.7"')
+    if rng.random() < CRACKS:
+        cw, reach = rng.uniform(*CRACK), rng.uniform(*CRACK_REACH)
+        end = (x + (left[0] - x) * reach, top_of(x) + (left[1] - top_of(x)) * reach)
+        svg.path(poly([(x - cw / 2, top_of(x)), (x + cw / 2, top_of(x)), end]), hazed(CLIFF['deep']), name='crack',
+                 extra=' fill-opacity="0.8"')
+
+
+def column_spans(x0, x1, rng):
+    """(x, w) of the slabs side by side from x0 to x1: broad ones with narrow slivers among them, their widths uneven,
+    scaled to fill the span."""
+    widths = [rng.uniform(*(SLIVER_WIDTH if rng.random() < SLIVERS else SLAB_WIDTH))]
+    while sum(widths) < x1 - x0 - SLAB_WIDTH[0] / 2:
+        widths.append(rng.uniform(*(SLIVER_WIDTH if rng.random() < SLIVERS else SLAB_WIDTH)))
+    scale = (x1 - x0) / sum(widths)
+    spans, x = [], x0
+    for w in widths:
+        spans.append((x, w * scale))
+        x += w * scale
+    return spans
+
+
+def slab_row(svg, step, rng):
+    """The slabs the block's face is split into, side by side under its cap, none where the water runs down: each
+    standing out in a tone of the light other than its standing neighbour's, or now and then set back between two
+    that do."""
     x0, x1 = block_span(step)
-    x = x0 + rng.uniform(0, 3)
-    k = 0
-    while x + widths[0] < x1 - 1:
-        w = min(rng.uniform(*widths), x1 - 1 - x)
-        gap = rng.uniform(*FLUTE_GAP)
-        if not in_the_cleft(x, x + w + gap):
+    cleft = (FALL_X[0] - HOLLOW - 2, FALL_X[1] + HOLLOW + 2)
+    runs = [(x0, x1 - 1)] if x0 >= cleft[1] or x1 <= cleft[0] else [(x0, cleft[0]), (cleft[1], x1 - 1)]
+    tone, set_back = None, True
+    for a, b in runs:
+        if b - a < SLIVER_WIDTH[0]:
+            continue
+        for x, w in column_spans(a, b, rng):
             light = 'shade' if shaded_at(x + w / 2) else 'lit'
-            colour, alpha = FLUTES[light][k % 2]
-            drop = rng.uniform(*FLUTE_TOP)
-            svg.path(flute(x, x + w, lambda xx: top_of(xx) + drop, rng.uniform(-FLUTE_LEAN, FLUTE_LEAN),
-                           rng.uniform(-FLUTE_TAPER, FLUTE_TAPER)), hazed(colour), name='flute',
-                     extra=' fill-opacity="%s"' % round(alpha * fade, 3))
-            if x + w + gap < x1 - 1:
-                gap_colour, gap_alpha = GAPS[light]
-                svg.path(poly([(x + w - 0.5, top_of(x + w) + drop + 2), (x + w + gap, top_of(x + w + gap) + drop + 2),
-                               (x + w + gap, FOOT), (x + w - 0.5, FOOT)]), hazed(gap_colour), name='gap',
-                         extra=' fill-opacity="%s"' % round(gap_alpha * fade, 3))
-            k += 1
-        x += w + gap
+            set_back = not set_back and rng.random() < SET_BACK
+            if not set_back:
+                tone = rng.choice([t for t in SLABS[light] if t != tone])
+            slab(svg, x, w, light, tone or SLABS[light][0], set_back, rng)
 
 
-def flutes(svg, step, rng):
-    """The columns down a block's face: a row from under the cap to the foot, and a fainter lower tier starting part way
-    down over it, so the face reads as stacked columns."""
-    column_row(svg, step, rng, cap_front_y)
-    column_row(svg, step, rng, lambda x: lip_y(step, x) + (FOOT - lip_y(step, x)) * TIER, widths=TIER_WIDTH, fade=TIER_FADE)
+def lump(x, w, top, rng):
+    """A rounded rock's outline: its crown off its middle, one shoulder lower than the other, its sides spreading out a
+    little down to the foot."""
+    peak = 0.5 + rng.uniform(-BOULDER_PEAK, BOULDER_PEAK)
+    dome = w * rng.uniform(*BOULDER_DOME)
+    sag = [rng.uniform(0.8, 1.2), rng.uniform(0.8, 1.2)]
+    points = []
+    for k in range(17):
+        t = k / 16
+        u = t / peak * 0.5 if t < peak else 0.5 + (t - peak) / (1 - peak) * 0.5
+        side = sag[0] if t < peak else sag[1]
+        points.append((x + w * t, top + dome * (1 - math.sin(math.pi * u)) * side))
+    flare = w * BOULDER_FLARE
+    return points + [(x + w + flare, FOOT), (x - flare, FOOT)], (x + w * peak, top), dome
+
+
+def boulders(svg, step, rng):
+    """The rounded rock heaped against the foot of the block's face over the slabs' points, big ones standing high at
+    the back and smaller ones lower in front, drawn back to front, each lighter where the sun catches its crown, the
+    lowest hidden by the hills."""
+    x0, x1 = block_span(step)
+    rocks = []
+    for widths, rises in BOULDER_ROWS:
+        x = max(LEFT, x0 - 2 + rng.uniform(0, 6))
+        while x < x1 - 4:
+            w = min(rng.uniform(*widths), (RIGHT - x) / (1 + BOULDER_FLARE))
+            if not in_the_cleft(x - w * BOULDER_FLARE, x + w * (1 + BOULDER_FLARE)):
+                rocks.append((visible_foot(x) - rng.uniform(*rises), x, w))
+            x += w * rng.uniform(0.5, 0.9)
+    for top, x, w in sorted(rocks):
+        x = max(x, LEFT + w * BOULDER_FLARE, edge_x(LEFT, top, 1))
+        w = min(w, edge_x(RIGHT, top, -1) - x)
+        light = 'shade' if shaded_at(x + w / 2) else 'lit'
+        outline, crown, dome = lump(x, w, top, rng)
+        svg.path(poly(outline), hazed(rng.choice(BOULDERS[light])), name='boulder')
+        crest = outline[:17]
+        lit = [p for p in crest if p[0] <= crown[0] + w * 0.08]
+        inner = [(px + w * 0.14, py + dome * 0.7) for px, py in reversed(lit)]
+        svg.path(poly(lit + inner), hazed(FACET_TONE[light]), name='boulder light', extra=' fill-opacity="0.65"')
+        dark = [p for p in crest if p[0] >= crown[0] + w * 0.15] + [outline[17]]
+        svg.path(poly(dark + [(px - w * 0.16, py + 2) for px, py in reversed(dark)]), hazed(PLANE_TONE[light]),
+                 name='boulder shade', extra=' fill-opacity="0.6"')
 
 
 def undercut(svg):
     """The dark band under the caps where the turf overhangs the rock, along both tops and down the riser."""
-    xs = [LIP_LEFT + (LIP_RIGHT - LIP_LEFT) * k / 96 for k in range(97)]
-    band = [(x, cap_front_y(x)) for x in xs] + [(x, cap_front_y(x) + UNDERCUT + 0.8 * math.sin(x / 4.0)) for x in reversed(xs)]
+    xs = with_gap([LIP_LEFT + (LIP_RIGHT - LIP_LEFT) * k / 96 for k in range(97)])
+    low = lowered
+    band = [(x, low(x, cap_front_y(x))) for x in xs] + \
+        [(x, low(x, cap_front_y(x) + UNDERCUT + 0.8 * math.sin(x / 4.0))) for x in reversed(xs)]
     svg.path(poly(band), CLIFF['deep'], name='undercut', extra=' fill-opacity="0.7"')
 
 
 def shelf(svg, step):
     """A flat top seen a little from above: the sunlit cap from its back edge down to its front edge, the lip,
     brightest along the lip, its turf hanging over the lip in tongues."""
-    xs = samples(step, 48)
-    front = [(x, cap_front_y(x) + 1) for x in xs]
-    band = [(x, cap_top_y(step, x)) for x in xs] + list(reversed(front))
+    xs = with_gap(samples(step, 48))
+    low = lowered
+    front = [(x, low(x, cap_front_y(x) + 1)) for x in xs]
+    band = [(x, low(x, cap_top_y(step, x))) for x in xs] + list(reversed(front))
     y0, y1 = min(y for _, y in band), max(y for _, y in band)
-    drips = [(x, cap_front_y(x) - 1) for x in xs] + [(x, cap_front_y(x) + drip_depth(x)) for x in reversed(xs)]
+    drips = [(x, low(x, cap_front_y(x) - 1)) for x in xs] + [(x, low(x, cap_front_y(x) + drip_depth(x))) for x in reversed(xs)]
     svg.path(poly(drips), mix(GRASS['mid'], GRASS['shade'], 0.35), name=step + ' drips')
     svg.path(poly(band), (mix(GRASS['mid'], GRASS['shade'], SHELF_FADE), GRASS['crest'], y0, y1), name=step + ' shelf')
 
@@ -346,34 +544,27 @@ def hollow_colour():
 def hollow(svg):
     """The shaded cleft the water runs down the cliff in, and the wet rock in its bed behind the strip."""
     xa, xb = FALL_X
-    y0 = top_y((xa + xb) / 2) + NOTCH
-    svg.path(poly([(xa - HOLLOW, y0 - NOTCH), (xb + HOLLOW, y0 - NOTCH), (xb + HOLLOW + 4, FOOT), (xa - HOLLOW - 4, FOOT)]),
-             hollow_colour(), name='hollow')
-    svg.path(poly([(xa - 1, y0 - NOTCH), (xb + 1, y0 - NOTCH), (xb + 2, FOOT), (xa - 2, FOOT)]), ROCK['wet'], name='wet rock')
+    xs = with_gap([xa - HOLLOW + (xb - xa + 2 * HOLLOW) * k / 16 for k in range(17)])
+    top = [(x, land_top_y(x)) for x in xs]
+    svg.path(poly(top + [(xb + HOLLOW + 4, FOOT), (xa - HOLLOW - 4, FOOT)]), hollow_colour(), name='hollow')
+    wet = [(x, y) for x, y in top if xa - 1 <= x <= xb + 1]
+    svg.path(poly(wet + [(xb + 2, FOOT), (xa - 2, FOOT)]), ROCK['wet'], name='wet rock')
 
 
 def land(svg, rng):
-    """The rock of both blocks in the sun's pink-lilac, the broad shadow over the lower block up to its warm sunlit
-    slab beside the cleft, the upper block's shaded left face from the cleft and the lit band down its right edge, each
-    face fluted, the cleft under the falls, and the undercut under the caps."""
+    """The rock of both blocks: each face split into slabs, the lower block's in the shadow's lilac blue and the upper
+    block's in the sun's pink-lilac but for its shaded left face from the cleft, boulders heaped at their feet, the
+    cleft under the falls, and the undercut under the caps."""
     svg.open('land')
-    svg.path(poly(outline()), hazed(CLIFF['face']), name='rock')
-    y_corner = top_y(LIP_LEFT)
-    for reach, alpha in ((0, 1.0), (-LIT_SLAB[0] * 0.3, 0.4)):
-        svg.path(poly([(LIP_LEFT - 1, y_corner - 1), (slab_edge_x(y_corner) + reach, y_corner - 1),
-                       (slab_edge_x(FOOT) + reach, FOOT), (LEFT - 1, FOOT)]), hazed(CLIFF['shade']), name='left shade',
-                 extra=' fill-opacity="%s"' % alpha)
-    svg.path(poly([(slab_edge_x(y_corner), y_corner - 1), (FALL_X[0], y_corner - 1), (FALL_X[0], FOOT), (slab_edge_x(FOOT), FOOT)]),
-             hazed(CLIFF['warm']), name='lit slab', extra=' fill-opacity="0.9"')
-    y_top = top_y(FALL_X[1])
-    for reach, alpha in ((0, 1.0), (-CLEFT_SHADE[0] * 0.3, 0.4)):
-        svg.path(poly([(FALL_X[1], y_top - 1), (cleft_shade_x(y_top) + reach, y_top - 1), (cleft_shade_x(FOOT) + reach, FOOT),
-                       (FALL_X[1], FOOT)]), hazed(CLIFF['shade']), name='cleft shade', extra=' fill-opacity="%s"' % alpha)
-    right = wall(RIGHT, -1)
-    svg.path(poly(right + [(x - LIT_EDGE, y) for x, y in reversed(right)]), hazed(CLIFF['lit']), name='lit edge',
-             extra=' fill-opacity="0.5"')
+    svg.path(poly(outline()), hazed(CLIFF['facet']), name='rock')
+    y = (UPPER_LIP + FOOT) / 2
+    svg.path(poly([(x, yy) for x, yy in outline() if x < slab_edge_x(y)] + [(slab_edge_x(FOOT), FOOT), (slab_edge_x(LOWER_LIP), LOWER_LIP - 4)]),
+             hazed(CLIFF['shade']), name='shade rock')
     for step in ('lower', 'upper'):
-        flutes(svg, step, rng)
+        slab_row(svg, step, rng)
+    heap = random.Random(SEED + ' boulders')
+    for step in ('lower', 'upper'):
+        boulders(svg, step, heap)
     hollow(svg)
     undercut(svg)
     svg.close()
@@ -430,29 +621,100 @@ def pour_top_y(x):
 
 def pour_outline():
     """([(x, y)] the pour's rounded left shoulder from its top down to the leaning edge, [(x, y)] its top, the lip's
-    arc, from the shoulder to the right edge)."""
+    arc, from the shoulder to where its right shoulder turns down)."""
     xa, xb = fall_edges(FALL_TOP)
     r = (xb - xa) * ROLL_RADIUS
     n = 12
-    top = [(xa + r + (xb - xa - r) * k / n, pour_top_y(xa + r + (xb - xa - r) * k / n)) for k in range(n + 1)]
+    xs = [xa + r + (xb - ROLL_RIGHT - xa - r) * k / n for k in range(n + 1)]
+    top = [(x, pour_top_y(x)) for x in xs]
     cy = top[0][1] + r
     shoulder = [(xa + r - r * math.sin(math.pi / 2 * k / 6), cy - r * math.cos(math.pi / 2 * k / 6)) for k in range(7)]
     return shoulder, top
 
 
-def pour(svg):
-    """The water rolling over the lip, the whole width of the falls' top: light blue under a white crest along the
-    lip's arc, its left shoulder rounding over the edge, the shadow side starting a little below the crest."""
-    xb = FALL_X[1]
-    y_end = FALL_TOP + POUR_CURL
+def right_shoulder():
+    """[(x, y)] the pour's right shoulder from the lip's arc's end, turning down to the falls' straight right edge."""
+    x0, y0 = pour_outline()[1][-1]
+    return [(x0 + ROLL_RIGHT * math.sin(math.pi / 2 * k / 4), y0 + ROLL_RIGHT * (1 - math.cos(math.pi / 2 * k / 4)))
+            for k in range(1, 5)]
+
+
+def roll_top_y(x):
+    """The roll's top at x, its arc and its right shoulder."""
+    x0, y0 = pour_outline()[1][-1]
+    if x <= x0:
+        return pour_top_y(x)
+    return y0 + ROLL_RIGHT - math.sqrt(max(0.0, ROLL_RIGHT ** 2 - (x - x0) ** 2))
+
+
+def roll_outline():
+    """[(x, y)] round the roll's left shoulder, along the lip's arc and down its right shoulder."""
     shoulder, top = pour_outline()
-    rim = list(reversed(shoulder)) + top
-    svg.path(poly(rim + [(xb, y_end), (fall_edges(y_end)[0], y_end)]), WATER['body'], name='pour')
+    return list(reversed(shoulder)) + top + right_shoulder()
+
+
+def pour(svg):
+    """The water rolling over the lip, the whole width of the falls' top, as painted in the markup: pale cyan shading down
+    into the falls' body, solid down to its foot, faint light streaks over it and its right side a little darker.
+    Its foot is the body's own colour, so where the falls come out from under it there is no line, and its left
+    side carries the falls' thread of light blue, or the roll looked a step wider than the water."""
+    xb = FALL_X[1]
+    y_end = LIP_FOOT
+    shoulder, top = pour_outline()
+    svg.path(poly(pour_shape()), (WATER['pour'], pour_foot_colour(), min(y for _, y in top), y_end), name='pour')
     shade, pale = shadow_side()
-    svg.path(poly([(shade, pour_top_y(shade) + CREST), (pale, pour_top_y(pale) + CREST), (pale, y_end), (shade, y_end)]),
-             WATER['shadow'], name='pour shade')
-    crest = list(reversed(shoulder[:3])) + top
-    svg.path(poly(crest + [(x, y + CREST) for x, y in reversed(crest)]), WATER['streak'], name='crest')
+    xs = [shade + (pale - shade) * k / 6 for k in range(7)]
+    svg.path(poly([(x, roll_top_y(x) + CREST) for x in xs] + [(pale, y_end), (shade, y_end)]),
+             WATER['shadow'], name='pour shade', extra=' fill-opacity="%s"' % POUR_SHADE)
+    lower = shoulder[3:]
+    svg.path(poly(lower + [(fall_edges(y_end)[0], y_end), (fall_edges(y_end)[0] + LEFT_EDGE, y_end)]
+                  + [(x + LEFT_EDGE, y) for x, y in reversed(lower)]), WATER['left edge'], name='pour left edge')
+    xa = fall_edges(FALL_TOP)[0]
+    for share, width, lean, length in POUR_STREAKS:
+        x = xa + (xb - xa) * share
+        y = roll_top_y(x) + CREST
+        length = min(length, y_end - STREAK_CLEAR - y)
+        svg.path(poly([(x, y), (x + width, y), (x + width / 2 + lean, y + length)]), WATER['streak'],
+                 name='pour streak', extra=' fill-opacity="%s"' % POUR_STREAK)
+
+
+def pour_shape():
+    """The roll's outline: round its shoulders, along the lip's arc and down to its foot."""
+    return roll_outline() + [(FALL_X[1], LIP_FOOT), (fall_edges(LIP_FOOT)[0], LIP_FOOT)]
+
+
+def pour_foot_colour():
+    """The roll's colour at its foot: the falls' body, so the falls carry on from under it without a line."""
+    return WATER['body']
+
+
+def crest(svg):
+    """The white crest along the lip's arc and round its shoulder."""
+    shoulder, top = pour_outline()
+    svg.path(poly(crest_band(shoulder, top, CREST)), WATER['streak'], name='crest')
+
+
+def crest_glow(svg):
+    """The band the crest blends on into the water under it, drawn on its own so the scene can breathe it."""
+    shoulder, top = pour_outline()
+    glow, opacity = CREST_GLOW
+    svg.path(poly(crest_band(shoulder, top, CREST + glow)), WATER['streak'], name='crest glow',
+             extra=' fill-opacity="%s"' % opacity)
+
+
+def crest_band(shoulder, top, thick):
+    """The band thick px deep along the lip's arc and in round its shoulders, each shoulder's arc drawn in toward its
+    centre."""
+    cx, cy = shoulder[0][0], shoulder[-1][1]
+    r = cy - shoulder[0][1]
+    right = right_shoulder()
+    rx, ry = top[-1][0], top[-1][1] + ROLL_RIGHT
+    keep = max(0.0, ROLL_RIGHT - thick) / ROLL_RIGHT
+    outer = list(reversed(shoulder)) + top + right
+    inner = [(rx + (x - rx) * keep, ry + (y - ry) * keep) for x, y in reversed(right)] + \
+        [(x, y + thick) for x, y in reversed(top)] + \
+        [(cx + (x - cx) * (r - thick) / r, cy + (y - cy) * (r - thick) / r) for x, y in shoulder]
+    return outer + inner
 
 
 
@@ -461,15 +723,12 @@ def pour(svg):
 
 
 
-def veil(svg):
-    """The white of the water just over the lip, fading down the falls in steps: brightest where the sheet is thin
-    and fast, the light blue body showing through lower down."""
-    shade, _ = shadow_side()
-    step = VEIL[0] / len(VEIL[1])
-    for k, alpha in enumerate(VEIL[1]):
-        y0, y1 = FALL_TOP + k * step, FALL_TOP + (k + 1) * step
-        svg.path(poly([(fall_edges(y0)[0], y0), (shade, y0), (shade, y1), (fall_edges(y1)[0], y1)]), WATER['streak'], name='veil',
-                 extra=' fill-opacity="%s"' % alpha)
+
+def strip_top():
+    """sheet px, the strip's top: just under the lowest point of the water's lip, its left shoulder, so the pour and
+    the bank drawn over it hide its square top."""
+    xa = FALL_X[0] + LEAN
+    return math.ceil(cap_front_y(xa + (FALL_X[1] - xa) * ROLL_RADIUS) + LIP[0]) + 1
 
 
 def shadow_side():
@@ -629,39 +888,70 @@ def tree(svg, t):
 
 
 def trees(svg, step, behind=False):
-    """The trees on that top in front of the ring, or with behind, the ones behind it."""
+    """The trees on that top in front of the ring, or with behind, the ones behind it, back to front."""
     svg.open('trees behind the ring' if behind else step + ' trees')
-    for t in TREES:
-        if step_of(t['x']) == step and bool(t.get('behind')) == behind:
-            tree(svg, t)
+    for t in sorted((t for t in TREES if step_of(t['x']) == step and bool(t.get('behind')) == behind),
+                    key=lambda t: (tree_foot(t), t['x'])):
+        tree(svg, t)
     svg.close()
+
+
 
 
 # ================================================================ waterfall and spray
 
-def streaks(rng):
-    """[(x, y, w, h, colour)] the strip's streaks within one period, y measured from the strip's top: white wisps
-    over the pale left of the sheet, thin pale ones breaking into its shadow side."""
+def smooth(t):
+    t = max(0.0, min(1.0, t))
+    return t * t * (3 - 2 * t)
+
+
+def bands(name):
+    """[(colour, opacity, points)] the strip's zigzag bands within one period, from the strip's top, each band's layers
+    outer to inner: a row of teeth across the strip hanging down under notches rising above it, as in the
+    reference, blending out to a lighter core. Each band's teeth are of their own widths, lengths and leans, its top
+    tilts a little and the bands sit at uneven heights; a band short of an edge thins out to nothing at its end, so
+    the bands are not ruled right across, and no two teeth or bands match."""
+    strip = STRIPS[name]
+    rng = random.Random(SEED + ' ' + name)
     xa, xb = FALL_X
-    shade, pale = shadow_side()
+    thick, (hang0, hang1), notch = strip['thick'], strip['hang'], strip['notch']
+    tooth, least, most = strip['tooth']
     out = []
-    for k in range(STREAKS):
-        shaded = k % 4 == 3
-        w = rng.uniform(1, 1.8) if shaded else rng.uniform(2, 5)
-        x = rng.uniform(shade + 0.5, pale - 0.5 - w) if shaded else rng.uniform(xa + 1, shade - w)
-        y = rng.uniform(0, FALL_PERIOD)
-        h = rng.uniform(30, 70)
-        out.append((x, y, w, h, WATER['shadow streak'] if shaded else WATER['streak']))
+    for at, (s0, s1) in zip(strip['at'], strip['spans']):
+        y = FALL_TOP + strip['period'] * at
+        tilt = rng.uniform(-BAND_TILT, BAND_TILT)
+        x0, x1 = xa + (xb - xa) * s0, xa + (xb - xa) * s1
+        edges = [x0 - (rng.uniform(0, tooth) if s0 == 0 else 0)]
+        while edges[-1] < x1:
+            edges.append(min(edges[-1] + tooth * rng.uniform(least, most), x1 + (tooth if s1 == 1 else 0)))
+        points = [a + (b - a) * (0.5 + rng.uniform(-TOOTH_LEAN, TOOTH_LEAN)) for a, b in zip(edges, edges[1:])]
+        rises = [rng.uniform(*notch) for _ in edges]
+        drops = [rng.uniform(hang0, hang1) for _ in points]
+
+        def full(x):
+            """How much of its depth the band has at x: whole, thinning out toward an end short of the strip's edge."""
+            k = 1.0
+            if s0 > 0:
+                k = min(k, smooth((x - x0) / TAPER))
+            if s1 < 1:
+                k = min(k, smooth((x1 - x) / TAPER))
+            return k
+        for colour, opacity, below, depth, share in strip['layers']:
+            def top(x):
+                return y + below + tilt * (x - xa)
+            upper, lower = [], []
+            for j, x in enumerate(edges):
+                upper.append((x, top(x) - rises[j] * share * full(x)))
+                if j < len(points):
+                    px = points[j]
+                    upper.append((px, top(px) + 0.5 * full(px)))
+                    lower.append((px, top(px) + (thick * depth + drops[j] * share) * full(px)))
+                lower.append((x, top(x) + thick * depth * 0.6 * full(x)))
+            out.append((WATER[colour], opacity, upper + list(reversed(lower))))
     return out
 
 
-def wisp(x, y, w, h, steps=6):
-    """A streak of falling water as a polygon: rounded at its top, w wide, narrowing a little to a blunt end h px below."""
-    r = w / 2
-    cx = x + r
-    top = [(cx + r * math.cos(math.pi + math.pi * k / steps), y + r + r * math.sin(math.pi + math.pi * k / steps))
-           for k in range(steps + 1)]
-    return top + [(cx + r * 0.8, y + h * 0.8), (cx + r * 0.3, y + h), (cx - r * 0.3, y + h), (cx - r * 0.7, y + h * 0.85)]
+TOOTH_LEAN = 0.2                 # share of its width a tooth's point may stand off its middle either way
 
 
 def lozenge(x, y, w, h, steps=6):
@@ -673,6 +963,10 @@ def lozenge(x, y, w, h, steps=6):
     bottom = [(cx + r * math.cos(math.pi * k / steps), y + h - r + r * math.sin(math.pi * k / steps))
               for k in range(steps + 1)]
     return top + bottom
+
+
+def ellipse(cx, cy, rx, ry, steps=24):
+    return [(cx + rx * math.cos(2 * math.pi * k / steps), cy + ry * math.sin(2 * math.pi * k / steps)) for k in range(steps)]
 
 
 def clipped(points, y0, y1):
@@ -692,36 +986,103 @@ def clipped(points, y0, y1):
     return points
 
 
-def waterfall(svg, rng, periods=1):
-    """The strip: the water's body with feathered edges and its streaks, all within one period. A streak running
-    off the strip's bottom carries on from its top (each streak is clipped to the strip at its place and a period
-    above and below it), so the rows at the strip's top are the rows past its bottom and it tiles. Drawn over more
-    periods, the drawing repeats every period."""
-    xa, xb = FALL_X
-    y0, y1 = FALL_TOP, FALL_TOP + periods * FALL_PERIOD
-    svg.open('waterfall')
-    svg.path(poly([(xa, y0), (xb, y0), (xb, y1), (xa, y1)]), WATER['body'], name='water')
-    shade, pale = shadow_side()
-    svg.path(poly([(shade, y0), (pale, y0), (pale, y1), (shade, y1)]), WATER['shadow'], name='water shadow')
-    svg.path(poly([(pale, y0), (xb, y0), (xb, y1), (pale, y1)]), WATER['edge'], name='water edge')
-    for x, y, w, h, colour in streaks(rng):
+def clipped_x(points, x0, x1):
+    """The polygon's part between the lines x0 and x1, or [] when none of it is."""
+    return [(x, y) for y, x in clipped([(y, x) for x, y in points], x0, x1)]
+
+
+def waterfall(svg, name, periods=1):
+    """A strip: its zigzag bands, all within one period, its body being the shape's under it. A band running off the
+    strip's top or bottom carries on past the other (each band is clipped to the strip at its place and a period
+    above and below it), so the strip tiles. Drawn over more periods, the drawing repeats every period."""
+    period = STRIPS[name]['period']
+    y0, y1 = FALL_TOP, FALL_TOP + periods * period
+    svg.open('falls ' + name)
+    for colour, opacity, points in bands(name):
         for copy in range(FALL_COPIES[0], periods + FALL_COPIES[-1]):
-            piece = clipped(wisp(x, y0 + y + copy * FALL_PERIOD, w, h), y0, y1)
+            piece = clipped([(x, y + copy * period) for x, y in points], y0, y1)
             if piece:
-                svg.path(poly(piece), colour, name='streak', extra=' fill-opacity="0.9"')
+                svg.path(poly(piece), colour, name='band', extra=' fill-opacity="%s"' % opacity)
     svg.close()
+
+
+# ---------------------------------------------------------------- the foam
+
+def bed_outline(n=96):
+    """[(x, y)] round the foam bed, the mound the FOAM_BED circles make: along their top from left to right and
+    back along their foot."""
+    cx, cy = SPRAY_CENTRE
+    x0 = min(cx + dx - r for dx, _, r in FOAM_BED)
+    x1 = max(cx + dx + r for dx, _, r in FOAM_BED)
+    top, foot = [], []
+    for k in range(n + 1):
+        x = x0 + (x1 - x0) * k / n
+        ys = [(cy + dy - math.sqrt(r * r - (x - cx - dx) ** 2), cy + dy + math.sqrt(r * r - (x - cx - dx) ** 2))
+              for dx, dy, r in FOAM_BED if abs(x - cx - dx) < r]
+        if ys:
+            top.append((x, min(y for y, _ in ys)))
+            foot.append((x, max(y for _, y in ys)))
+    return top + list(reversed(foot))
 
 
 def spray(svg):
-    """The mist where the water lands: a low, wide plume spreading both ways, thinning at its ends."""
+    """The foam where the water lands: a low solid mound little wider than the falls, its shade still under it, the
+    mist breathing over it, and each set of foam rising off it in a group of its own the scene moves on its own."""
     cx, cy = SPRAY_CENTRE
-    svg.open('spray')
-    svg.path(' '.join(circle(cx + dx, cy + dy + 1.5, r) for dx, dy, r in SPRAY_PUFFS), SPRAY['shade'], name='spray shade',
-             extra=' fill-opacity="0.4"')
-    svg.path(' '.join(circle(cx + dx, cy + dy, r * 0.9) for dx, dy, r in SPRAY_PUFFS), SPRAY['body'], name='spray', extra=' fill-opacity="0.85"')
-    for dx, dy, w, h in SPRAY_STREAKS:
-        svg.path(poly(lozenge(cx + dx, cy + dy, w, h)), SPRAY['mist'], name='thrown water', extra=' fill-opacity="0.8"')
+    bed = bed_outline()
+    down, opacity = FOAM_SHADE
+    svg.open('spray shade')
+    svg.path(poly([(x, y + down) for x, y in bed]), SPRAY['shade'], name='spray shade', extra=' fill-opacity="%s"' % opacity)
     svg.close()
+    svg.open('spray bed')
+    svg.path(poly(bed), SPRAY['body'], name='foam bed')
+    svg.close()
+    for side, (x0, x1) in (('left', (-1e9, cx)), ('right', (cx, 1e9))):
+        svg.open('spray churn mask ' + side)
+        svg.path(poly(clipped_x(bed, x0, x1)), '#000000', name='churn mask')
+        svg.close()
+    dx, dy, rx, ry = MIST
+    svg.open('spray mist')
+    svg.path(poly(ellipse(cx + dx, cy + dy, rx, ry)), SPRAY['mist'], name='mist', extra=' fill-opacity="%s"' % MIST_OPACITY)
+    svg.close()
+    for k, puffs in enumerate(RISING):
+        svg.open('spray rise %s' % 'ab'[k])
+        svg.path(' '.join(circle(cx + dx, cy + dy, r) for dx, dy, r in puffs), SPRAY['body'], name='spray',
+                 extra=' fill-opacity="0.8"')
+        svg.close()
+
+
+def churn_box():
+    """(x, y, w, h) sheet px of the churn strip: one period wide, left of the spray's centre; the scene draws it there
+    and again a period to the right, rolling each out from the centre."""
+    cx, cy = SPRAY_CENTRE
+    return cx - CHURN_PERIOD, cy - CHURN_ABOVE, CHURN_PERIOD, CHURN_HEIGHT
+
+
+def churn(svg, periods=1):
+    """The strip of dimples rolling out over the foam: each drawn at its place and a period either side, clipped to
+    the strip, so it tiles sideways. Drawn over more periods, the drawing repeats every period."""
+    x0, y0, w, h = churn_box()
+    cx, cy = SPRAY_CENTRE
+    svg.open('churn')
+    for dx, dy, rx, ry, opacity in DIMPLES:
+        for copy in range(-1, periods + 1):
+            piece = clipped_x(ellipse(x0 + dx + copy * w, cy + dy, rx, ry), x0, x0 + periods * w)
+            if piece:
+                svg.path(poly(piece), SPRAY['shade'], name='dimple', extra=' fill-opacity="%s"' % opacity)
+    svg.close()
+
+
+def thrown(svg):
+    """Each set of loose water thrown up from the spray, in a group of its own the scene throws up and fades."""
+    cx, cy = SPRAY_CENTRE
+    for k, (streaks_, drops) in enumerate(THROWN):
+        svg.open('thrown water %s' % 'ab'[k])
+        for dx, dy, w, h in streaks_:
+            svg.path(poly(lozenge(cx + dx, cy + dy, w, h)), SPRAY['mist'], name='thrown water', extra=' fill-opacity="0.8"')
+        svg.path(' '.join(circle(cx + dx, cy + dy, r) for dx, dy, r in drops), SPRAY['body'], name='drops',
+                 extra=' fill-opacity="0.85"')
+        svg.close()
 
 
 # ================================================================ sheet
@@ -738,7 +1099,6 @@ def mesa(svg, rng):
     trees(svg, 'upper')
     shelf(svg, 'lower')
     trees(svg, 'lower')
-    ledge(svg)
     svg.close()
 
 
@@ -747,9 +1107,14 @@ def main():
     rng = random.Random(SEED)
     svg.open('gear-arch mesa')
     mesa(svg, rng)
-    waterfall(svg, random.Random(SEED + ' waterfall'))
+    falls_shape(svg)
+    falls_mask(svg)
+    for name in STRIPS:
+        waterfall(svg, name)
+    falls_lip(svg)
     spray(svg)
-    falls_frame(svg)
+    churn(svg)
+    thrown(svg)
     svg.close()
     svg.write(cutting.sheet_path('scenery/mesa.svg'))
 
@@ -767,39 +1132,134 @@ def fall_width(y):
     return right - left
 
 
-def falls_frame(svg):
-    """Drawn over the strip: the gully's shaded wall covering the strip's left side beside the leaning edge, the white
-    fading down from the lip, and the water rounding over the lip under its white crest."""
-    shoulder, _ = pour_outline()
-    xl = FALL_X[0] - HOLLOW - 1
-    y0, y1 = shoulder[-1][1], FALL_TOP + FALL_PERIOD
-    ys = [y0 + (y1 - y0) * k / 24 for k in range(25)]
-    edge = [(fall_edges(y)[0], y) for y in ys]
-    turf = [(xl + (shoulder[0][0] - xl) * k / 6, cap_front_y(xl + (shoulder[0][0] - xl) * k / 6) + 1) for k in range(7)]
-    svg.open('falls frame')
-    svg.path(poly([(xl, y1)] + list(reversed(edge)) + list(reversed(shoulder)) + list(reversed(turf))), hollow_colour(),
-             name='left bank')
-    veil(svg)
-    pour(svg)
+def water_shape():
+    """The falls' outline from the strip's top, under the lip, down the leaning edge to the foam, and up the straight
+    right edge. The strips are drawn only inside it, so no band passes the foam; the lip is solid over its top, so
+    none shows above the lip's foot either, and the lip's foot fades out over water of its own colour, not rock."""
+    return roll_outline() + [(FALL_X[1], FOAM_LINE)] + list(reversed(left_edge(LIP_FOOT)))
+
+
+def left_edge(y0):
+    """[(x, y)] down the falls' leaning left edge from y0 to the foam."""
+    y1 = FOAM_LINE
+    return [(fall_edges(y0 + (y1 - y0) * k / 24)[0], y0 + (y1 - y0) * k / 24) for k in range(25)]
+
+
+def falls_shape(svg):
+    """The water's body in its shape, under the strips: the cyan sheet paling toward the foam as it goes to foam, its
+    deep blue shadow side near the right deepening from the lip's shade, the thin pale edge along it, and a thread of
+    light blue down its left edge."""
+    shade, pale = shadow_side()
+    y0, y1 = FALL_TOP, FOAM_LINE
+    svg.open('falls shape')
+    svg.path(poly(water_shape()), (WATER['body'], mix(WATER['body'], '#ffffff', FOOT_PALE), LIP_FOOT, y1), name='water')
+    svg.path(poly(clipped([(shade, y0), (pale, y0), (pale, y1), (shade, y1)], y0, y1)),
+             (mix(WATER['body'], WATER['shadow'], POUR_SHADE), WATER['shadow'], LIP_FOOT, LIP_FOOT + SHADOW_FADE),
+             name='water shadow')
+    svg.path(poly([(pale, y0), (FALL_X[1], y0), (FALL_X[1], y1), (pale, y1)]), WATER['edge'], name='water edge')
+    edge = left_edge(LIP_FOOT)
+    svg.path(poly(edge + [(x + LEFT_EDGE, y) for x, y in reversed(edge)]), WATER['left edge'], name='water left edge')
     svg.close()
 
 
-def strip_part(group, grads):
-    """The waterfall as an image exactly one period tall, cut where it hangs from the lip."""
-    box = (FALL_X[0], FALL_TOP, FALL_X[1] - FALL_X[0], FALL_PERIOD)
-    return cutting.Part('scenery/parts/mesa/waterfall', svgtools.part_svg('mesa-waterfall', [group], grads, box), box)
+def falls_mask(svg):
+    """The water's silhouette in black: the scene adds it to itself, changing nothing, as the mask the front strip is
+    cut to, since the engine masks a node only to its earlier siblings and allows one masked node a parent."""
+    svg.open('falls mask')
+    svg.path(poly(water_shape()), '#000000', name='mask')
+    svg.close()
+
+
+def falls_lip(svg):
+    """Drawn over the falls: the water rounding over the lip, its silhouette in black as the mask for the front strip's
+    cut over it, its white crest and the crest's glow over them."""
+    svg.open('falls lip')
+    pour(svg)
+    svg.close()
+    svg.open('lip mask')
+    svg.path(poly(pour_shape()), '#000000', name='lip mask')
+    svg.close()
+    svg.open('falls crest')
+    crest(svg)
+    svg.close()
+    svg.open('falls crest glow')
+    crest_glow(svg)
+    svg.close()
+
+
+def band_spans(name):
+    """[(top, bottom)] sheet px of each band of the strip within its first period, its outer layer's."""
+    layers = bands(name)[::len(STRIPS[name]['layers'])]
+    return [(min(y for _, y in pts), max(y for _, y in pts)) for _, _, pts in layers]
+
+
+FALL_TOP = strip_top()
+LIP_FOOT = FALL_TOP + POUR_CURL
+FOAM_LINE = SPRAY_CENTRE[1] + 1      # the falls end here, inside the still foam bed
+
+
+def lip_box():
+    """(x, y, w, h) sheet px of the lip's parts: a whole number of canvas units up and left of the strip's corner, so
+    the lip's cuts of the strips line up with the falls', and an even height, as every part's."""
+    h = LIP_ABOVE + POUR_CURL
+    return FALL_X[0] - LIP_SIDE, FALL_TOP - LIP_ABOVE, FALL_X[1] - FALL_X[0] + 2 * LIP_SIDE, h + h % 2
+
+
+def spray_box():
+    left, up, w, h = SPRAY_BOX
+    return SPRAY_CENTRE[0] - left, SPRAY_CENTRE[1] - up, w, h
+
+
+def strip_part(root, grads, name):
+    """A strip as an image exactly one period tall, cut where it hangs from the lip."""
+    box = (FALL_X[0], FALL_TOP, FALL_X[1] - FALL_X[0], STRIPS[name]['period'])
+    return cutting.Part('scenery/parts/mesa/falls-' + name,
+                        svgtools.part_svg('mesa-falls-' + name, [cutting.find_group(root, 'falls ' + name)], grads, box), box)
 
 
 def cut():
-    """[(template id, its image)]: the mesa with its ring and trees, the waterfall strip, the spray, and the frame
-    drawn over the strip."""
+    """[(template id, its image)]: the mesa with its ring and trees, the water's shape and its black silhouette, the
+    two strips, the lip's layers and the spray's."""
     root, grads = cutting.load('scenery/mesa.svg')
-    return [('mesa', cutting.static_part('scenery/parts/mesa/mesa', [cutting.find_group(root, 'mesa')], grads, 'mesa')),
-            ('mesa-waterfall', strip_part(cutting.find_group(root, 'waterfall'), grads)),
-            ('mesa-spray', cutting.static_part('scenery/parts/mesa/spray', [cutting.find_group(root, 'spray')], grads,
-                                               'mesa-spray')),
-            ('mesa-falls-frame', cutting.static_part('scenery/parts/mesa/falls-frame', [cutting.find_group(root, 'falls frame')],
-                                                     grads, 'mesa-falls-frame'))]
+    box = (FALL_X[0], FALL_TOP, FALL_X[1] - FALL_X[0], FALL_PERIOD)
+    falls = [(tid, cutting.Part('scenery/parts/mesa/' + tid[len('mesa-'):],
+                                svgtools.part_svg(tid, [cutting.find_group(root, group)], grads, box), box))
+             for tid, group in (('mesa-falls-shape', 'falls shape'), ('mesa-falls-mask', 'falls mask'))]
+    return [('mesa', cutting.static_part('scenery/parts/mesa/mesa', [cutting.find_group(root, 'mesa')], grads, 'mesa'))] + \
+        falls + [('mesa-falls-' + name, strip_part(root, grads, name)) for name in STRIPS] + \
+        lip_layers(root, grads) + spray_layers(root, grads)
+
+
+def lip_layers(root, grads):
+    """The lip, its black silhouette, its crest and the crest's glow, cut to the lip's box, and each strip cut again
+    from the box's corner, a period tall, to slide over the lip as it does down the falls."""
+    x, y, w, h = lip_box()
+    lip = layers(root, grads, 'falls-lip', ['falls lip', 'lip mask', 'falls crest', 'falls crest glow'], (x, y, w, h))
+    cuts = []
+    for tid, name in (('mesa-lip-sheets', 'back'), ('mesa-lip-front', 'front')):
+        box = (x, y, w, STRIPS[name]['period'])
+        strip = svgtools.part_svg(tid, [cutting.find_group(root, 'falls ' + name)], grads, box)
+        cuts.append((tid, cutting.Part('scenery/parts/mesa/' + tid[len('mesa-'):], strip, box)))
+    return lip + cuts
+
+
+def spray_layers(root, grads):
+    """The spray's still layers and its rising sets, all cut to one box, and the churn strip, one period wide."""
+    out = layers(root, grads, 'spray', ['spray shade', 'spray bed', 'spray churn mask left', 'spray churn mask right',
+                                        'spray mist', 'spray rise a', 'spray rise b', 'thrown water a', 'thrown water b'],
+                 spray_box())
+    box = churn_box()
+    strip = svgtools.part_svg('mesa-spray-churn', [cutting.find_group(root, 'churn')], grads, box)
+    return out + [('mesa-spray-churn', cutting.Part('scenery/parts/mesa/spray-churn', strip, box))]
+
+
+def layers(root, grads, name, groups, box):
+    """[(template id, its image)] of each group, all cut to the box, so the scene stacks them at one place and
+    animates each on its own: the first named mesa-<name>, the rest after their group."""
+    elements = [cutting.find_group(root, g) for g in groups]
+    ids = ['mesa-' + name] + ['mesa-' + g.replace(' ', '-') for g in groups[1:]]
+    return [(tid, cutting.Part('scenery/parts/mesa/' + tid[len('mesa-'):], svgtools.part_svg(tid, [e], grads, box), box))
+            for tid, e in zip(ids, elements)]
 
 
 def parts():
@@ -808,4 +1268,3 @@ def parts():
 
 if __name__ == '__main__':
     main()
-
